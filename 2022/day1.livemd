@@ -1,0 +1,43 @@
+# Day 1
+
+```elixir
+Mix.install([{:kino, github: "livebook-dev/kino"}])
+```
+
+## Section
+
+```elixir
+input = Kino.Input.textarea("Input file")
+```
+
+## Part 1
+
+```elixir
+input
+|> Kino.Input.read()
+|> String.split("\n\n", trim: true)
+|> Enum.map(fn elem ->
+  elem
+  |> String.split("\n", trim: true)
+  |> Enum.map(&String.to_integer/1)
+  |> Enum.reduce(fn val, acc -> acc + val end)
+end)
+|> Enum.max()
+```
+
+## Part 2
+
+```elixir
+input
+|> Kino.Input.read()
+|> String.split("\n\n", trim: true)
+|> Enum.map(fn elem ->
+  elem
+  |> String.split("\n", trim: true)
+  |> Enum.map(&String.to_integer/1)
+  |> Enum.reduce(fn val, acc -> acc + val end)
+end)
+|> Enum.sort(&(&1 >= &2))
+|> Enum.take(3)
+|> Enum.sum()
+```
