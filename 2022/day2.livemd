@@ -1,0 +1,126 @@
+# Day 2
+
+```elixir
+Mix.install([{:kino, github: "livebook-dev/kino"}])
+```
+
+## Common
+
+```elixir
+input = Kino.Input.textarea("Input file")
+```
+
+## Part 1
+
+```elixir
+# A: Rock
+# B: Paper
+# C: Scissors
+
+# X: Rock
+# Y: Paper
+# Z: Scissors
+
+# Values
+# Rock: 1 point
+# Paper: 2 points
+# Scissors: 3 points
+
+# Loss: 0
+# Tie: 3 points
+# Win: 6 points
+
+defmodule RockPaperScissor do
+  defp point_for_shape("X"), do: 1
+  defp point_for_shape("Y"), do: 2
+  defp point_for_shape("Z"), do: 3
+
+  defp point_for_round("A", "X"), do: 3
+  defp point_for_round("A", "Y"), do: 6
+  defp point_for_round("A", "Z"), do: 0
+
+  defp point_for_round("B", "X"), do: 0
+  defp point_for_round("B", "Y"), do: 3
+  defp point_for_round("B", "Z"), do: 6
+
+  defp point_for_round("C", "X"), do: 6
+  defp point_for_round("C", "Y"), do: 0
+  defp point_for_round("C", "Z"), do: 3
+
+  def points_for_round([them, me]) do
+    point_for_shape(me) + point_for_round(them, me)
+  end
+end
+
+input
+|> Kino.Input.read()
+|> String.split("\n", trim: true)
+|> Enum.map(fn round ->
+  round
+  |> String.split(" ", trim: true)
+  |> RockPaperScissor.points_for_round()
+end)
+|> Enum.sum()
+```
+
+## Part 2
+
+```elixir
+# A: Rock
+# B: Paper
+# C: Scissors
+
+# X: Need to lose
+# Y: Need to draw
+# Z: Need to Win
+
+# Values
+# Rock: 1 point
+# Paper: 2 points
+# Scissors: 3 points
+
+# Loss: 0
+# Tie: 3 points
+# Win: 6 points
+
+defmodule RockPaperScissor do
+  defp point_for_round_result("X"), do: 0
+  defp point_for_round_result("Y"), do: 3
+  defp point_for_round_result("Z"), do: 6
+
+  # Scissor
+  defp point_for_shape_to_play("A", "X"), do: 3
+  # Rock
+  defp point_for_shape_to_play("A", "Y"), do: 1
+  # Paper
+  defp point_for_shape_to_play("A", "Z"), do: 2
+
+  # Rock
+  defp point_for_shape_to_play("B", "X"), do: 1
+  # Paper
+  defp point_for_shape_to_play("B", "Y"), do: 2
+  # Scissor
+  defp point_for_shape_to_play("B", "Z"), do: 3
+
+  # Paper
+  defp point_for_shape_to_play("C", "X"), do: 2
+  # Scissor
+  defp point_for_shape_to_play("C", "Y"), do: 3
+  # Rock
+  defp point_for_shape_to_play("C", "Z"), do: 1
+
+  def points_for_round_result([them, result]) do
+    point_for_round_result(result) + point_for_shape_to_play(them, result)
+  end
+end
+
+input
+|> Kino.Input.read()
+|> String.split("\n", trim: true)
+|> Enum.map(fn round ->
+  round
+  |> String.split(" ", trim: true)
+  |> RockPaperScissor.points_for_round_result()
+end)
+|> Enum.sum()
+```
