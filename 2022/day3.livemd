@@ -1,0 +1,76 @@
+# Day 3
+
+```elixir
+Mix.install([{:kino, "~>0.7.0"}])
+```
+
+## Section
+
+```elixir
+input = Kino.Input.textarea("input fileP")
+```
+
+## Common
+
+```elixir
+defmodule Day3 do
+  def find_intersection([backpack1, backpack2]) do
+    MapSet.to_list(MapSet.intersection(MapSet.new(backpack1), MapSet.new(backpack2)))
+    |> hd()
+  end
+
+  def find_intersection_in_group([group1, group2, group3]) do
+    MapSet.to_list(
+      MapSet.intersection(
+        MapSet.intersection(MapSet.new(group1), MapSet.new(group2)),
+        MapSet.new(group3)
+      )
+    )
+    |> hd
+  end
+
+  def find_char_value(char) do
+    case is_lowercase?(char) do
+      true -> (char |> String.to_charlist() |> hd) - 96
+      false -> (char |> String.to_charlist() |> hd) - 38
+    end
+  end
+
+  defp is_lowercase?(value), do: Regex.match?(~r/[a-z]/, value)
+end
+```
+
+## Part 1
+
+```elixir
+input
+|> Kino.Input.read()
+|> String.split("\n", trim: true)
+|> Enum.map(fn rucksack ->
+  rucksack
+  |> String.split("", trim: true)
+  |> Enum.chunk_every(round(String.length(rucksack) / 2))
+  |> Day3.find_intersection()
+  |> Day3.find_char_value()
+end)
+|> Enum.sum()
+```
+
+## Part 2
+
+```elixir
+input
+|> Kino.Input.read()
+|> String.split("\n", trim: true)
+|> Enum.chunk_every(3)
+|> Enum.map(fn rucksack_group ->
+  rucksack_group
+  |> Enum.map(fn rucksack ->
+    rucksack
+    |> String.split("", trim: true)
+  end)
+  |> Day3.find_intersection_in_group()
+  |> Day3.find_char_value()
+end)
+|> Enum.sum()
+```
