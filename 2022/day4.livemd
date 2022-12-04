@@ -1,0 +1,99 @@
+# Day 4
+
+```elixir
+Mix.install([{:kino, "~>0.7.0"}])
+```
+
+## Setup
+
+```elixir
+input = Kino.Input.textarea("input file")
+```
+
+## Common
+
+```elixir
+defmodule Day4 do
+  def create_array_for_pair(pair_str) do
+    pair_str
+    |> String.split(",", trim: true)
+    |> Enum.map(fn section_range ->
+      section_range
+      |> String.split("-", trim: true)
+      |> Day4.create_array()
+    end)
+  end
+
+  def create_array([from_str, to_str]) do
+    String.to_integer(from_str)..String.to_integer(to_str)
+    |> Enum.map(fn val -> val end)
+  end
+
+  def one_fully_contains_another?([arr1, arr2]) do
+    case array_difference([arr1, arr2]) do
+      [] -> true
+      _ -> false
+    end
+  end
+
+  def has_some_intersection([arr1, arr2]) do
+    s1 = MapSet.new(arr1)
+    s2 = MapSet.new(arr2)
+    intersection = MapSet.intersection(s1, s2)
+
+    case MapSet.to_list(intersection) do
+      [] -> false
+      _ -> true
+    end
+  end
+
+  def count_occurrences(arr) do
+    arr
+    |> Enum.map(fn fully_contain ->
+      case fully_contain do
+        true -> 1
+        false -> 0
+      end
+    end)
+    |> Enum.sum()
+  end
+
+  # Private methods
+
+  defp array_difference([arr1, arr2]) when length(arr1) > length(arr2) do
+    arr2 -- arr1
+  end
+
+  defp array_difference([arr1, arr2]) when length(arr1) <= length(arr2) do
+    arr1 -- arr2
+  end
+end
+```
+
+## Part 1
+
+```elixir
+input
+|> Kino.Input.read()
+|> String.split("\n", trim: true)
+|> Enum.map(fn pair ->
+  pair
+  |> Day4.create_array_for_pair()
+  |> Day4.one_fully_contains_another?()
+end)
+|> Day4.count_occurrences()
+```
+
+## Part 2
+
+```elixir
+input
+|> Kino.Input.read()
+|> String.split("\n", trim: true)
+|> Enum.map(fn pair ->
+  pair
+  |> Day4.create_array_for_pair()
+  |> Day4.has_some_intersection()
+end)
+|> Day4.count_occurrences()
+```
