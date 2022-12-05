@@ -1,0 +1,127 @@
+# Day 5
+
+```elixir
+Mix.install([{:kino, "~>0.7.0"}])
+```
+
+## Setup
+
+```elixir
+input = Kino.Input.textarea("input file")
+```
+
+## Common
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+defmodule Day5 do
+  def prepare_input([stacks, movements]) do
+    parsed_stacks = stacks |> parse_stacks()
+    parsed_movements = movements |> parse_movements()
+
+    %{stacks: parsed_stacks, movements: parsed_movements}
+  end
+
+  def process_stacks_part1(%{:stacks => stacks, :movements => movements}) do
+    movements
+    |> Enum.reduce(stacks, fn movement, acc1 ->
+      1..movement[:qty]
+      |> Enum.reduce(acc1, fn _, acc2 ->
+        # pick top element
+        [el | rest] = acc2[movement[:from]]
+
+        acc2
+        |> Map.put(movement[:from], rest)
+        |> Map.put(movement[:to], [el | acc2[movement[:to]]])
+        |> Map.new()
+      end)
+    end)
+  end
+
+  def process_stacks_part2(%{:stacks => stacks, :movements => movements}) do
+    movements
+    |> Enum.reduce(stacks, fn movement, acc1 ->
+      {elements, rest} =
+        acc1[movement[:from]]
+        |> Enum.split(movement[:qty])
+
+      acc1
+      |> Map.put(movement[:from], rest)
+      |> Map.put(movement[:to], elements ++ acc1[movement[:to]])
+      |> Map.new()
+    end)
+  end
+
+  def get_letters(stacks) do
+    stacks
+    |> Enum.map(fn {_, val} ->
+      [head | _] = val
+      head
+    end)
+    |> Enum.join()
+  end
+
+  # Private
+
+  defp parse_movements(movements) do
+    movements
+    |> String.split("\n", trim: true)
+    |> Enum.map(fn instruction ->
+      instruction
+      |> parse_instruction()
+    end)
+  end
+
+  defp parse_instruction(instruction) do
+    [_, qty, from, to] = Regex.run(~r/move (\d+) from (\d+) to (\d+)/, instruction)
+    %{from: String.to_integer(from), to: String.to_integer(to), qty: String.to_integer(qty)}
+  end
+
+  defp parse_stacks(stacks) do
+    stacks
+    # I don't need the brackets
+    |> String.replace(~r"\[|\]", " ")
+    |> String.split("\n", trim: true)
+    |> Enum.map(fn row ->
+      row
+      |> String.split("   ")
+      |> Enum.map(&String.trim/1)
+      |> Enum.with_index(1)
+    end)
+    |> remove_stack_number()
+    |> Enum.group_by(&elem(&1, 1), &elem(&1, 0))
+    |> Map.new(fn {k, v} -> {k, Enum.drop_while(v, &(&1 == ""))} end)
+  end
+
+  defp remove_stack_number(xs) do
+    xs
+    |> Enum.reverse()
+    |> tl()
+    |> Enum.reverse()
+    |> List.flatten()
+  end
+end
+```
+
+## Part 1
+
+```elixir
+input
+|> Kino.Input.read()
+|> String.split("\n\n", trim: true)
+|> Day5.prepare_input()
+|> Day5.process_stacks_part1()
+|> Day5.get_letters()
+```
+
+## Part 2
+
+```elixir
+input
+|> Kino.Input.read()
+|> String.split("\n\n", trim: true)
+|> Day5.prepare_input()
+|> Day5.process_stacks_part2()
+|> Day5.get_letters()
+```
