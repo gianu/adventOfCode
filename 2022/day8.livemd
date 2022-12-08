@@ -1,0 +1,216 @@
+# Day 8
+
+```elixir
+Mix.install([{:kino, "~>0.7.0"}])
+```
+
+## Setup
+
+```elixir
+input = Kino.Input.textarea("input file")
+```
+
+## Common
+
+```elixir
+defmodule Day8 do
+  def tree_is_visible(_, _, y) when y == 0, do: true
+  def tree_is_visible(array_of_trees, _, y) when length(array_of_trees) == y + 1, do: true
+  def tree_is_visible(_, x, _) when x == 0, do: true
+
+  def tree_is_visible(array_of_trees, x, y) do
+    # is the tree the last from this row?
+
+    case length(Enum.at(array_of_trees, y)) == x + 1 do
+      true ->
+        true
+
+      false ->
+        biggest_tree_in_column(array_of_trees, x, y) || biggest_tree_in_row(array_of_trees, x, y)
+    end
+  end
+
+  def calculate_scenic_score(_, _, y) when y == 0, do: 0
+  def calculate_scenic_score(array_of_trees, _, y) when length(array_of_trees) == y + 1, do: 0
+  def calculate_scenic_score(_, x, _) when x == 0, do: 0
+
+  def calculate_scenic_score(array_of_trees, x, y) do
+    case length(Enum.at(array_of_trees, y)) == x + 1 do
+      true ->
+        0
+
+      false ->
+        calculate_view_distance_up(array_of_trees, x, y) *
+          calculate_view_distance_down(array_of_trees, x, y) *
+          calculate_view_distance_left(array_of_trees, x, y) *
+          calculate_view_distance_right(array_of_trees, x, y)
+    end
+  end
+
+  # Private methods
+  defp biggest_tree_in_row(array_of_trees, x, y) do
+    tree_height = Enum.at(Enum.at(array_of_trees, y), x)
+
+    {left, right} =
+      Enum.at(array_of_trees, y)
+      |> Enum.split(x)
+
+    max_left =
+      left
+      |> Enum.max()
+
+    [_ | remaining_right] = right
+
+    max_right =
+      remaining_right
+      |> Enum.max()
+
+    max_left < tree_height || max_right < tree_height
+  end
+
+  defp biggest_tree_in_column(array_of_trees, x, y) do
+    tree_height = Enum.at(Enum.at(array_of_trees, y), x)
+
+    transposed_array_of_trees =
+      array_of_trees
+      |> Enum.zip()
+      |> Enum.map(&Tuple.to_list/1)
+
+    {up, down} =
+      Enum.at(transposed_array_of_trees, x)
+      |> Enum.split(y)
+
+    max_up =
+      up
+      |> Enum.max()
+
+    [_ | remaining_down] = down
+
+    max_down =
+      remaining_down
+      |> Enum.max()
+
+    max_up < tree_height || max_down < tree_height
+  end
+
+  defp calculate_view_distance_up(array_of_trees, x, y) do
+    tree_height = Enum.at(Enum.at(array_of_trees, y), x)
+
+    transposed_array_of_trees =
+      array_of_trees
+      |> Enum.zip()
+      |> Enum.map(&Tuple.to_list/1)
+
+    {up, _} =
+      Enum.at(transposed_array_of_trees, x)
+      |> Enum.split(y)
+
+    up
+    |> Enum.reverse()
+    |> Enum.reduce_while(0, fn el, acc ->
+      if el >= tree_height, do: {:halt, acc + 1}, else: {:cont, acc + 1}
+    end)
+  end
+
+  defp calculate_view_distance_down(array_of_trees, x, y) do
+    tree_height = Enum.at(Enum.at(array_of_trees, y), x)
+
+    transposed_array_of_trees =
+      array_of_trees
+      |> Enum.zip()
+      |> Enum.map(&Tuple.to_list/1)
+
+    {_, down} =
+      Enum.at(transposed_array_of_trees, x)
+      |> Enum.split(y)
+
+    [_ | remaining_down] = down
+
+    remaining_down
+    |> Enum.reduce_while(0, fn el, acc ->
+      # IO.inspect("element: " <> Integer.to_string(el))
+      # IO.inspect("tree_height: " <> Integer.to_string(tree_height))
+      if el >= tree_height, do: {:halt, acc + 1}, else: {:cont, acc + 1}
+    end)
+  end
+
+  defp calculate_view_distance_left(array_of_trees, x, y) do
+    tree_height = Enum.at(Enum.at(array_of_trees, y), x)
+
+    {left, _} =
+      Enum.at(array_of_trees, y)
+      |> Enum.split(x)
+
+    left
+    |> Enum.reverse()
+    |> Enum.reduce_while(0, fn el, acc ->
+      if el >= tree_height, do: {:halt, acc + 1}, else: {:cont, acc + 1}
+    end)
+  end
+
+  defp calculate_view_distance_right(array_of_trees, x, y) do
+    tree_height = Enum.at(Enum.at(array_of_trees, y), x)
+
+    {_, right} =
+      Enum.at(array_of_trees, y)
+      |> Enum.split(x)
+
+    [_ | remaining_right] = right
+
+    remaining_right
+    |> Enum.reduce_while(0, fn el, acc ->
+      if el >= tree_height, do: {:halt, acc + 1}, else: {:cont, acc + 1}
+    end)
+  end
+end
+```
+
+## Part 1
+
+```elixir
+tree_heights =
+  input
+  |> Kino.Input.read()
+  |> String.split("\n", trim: true)
+  |> Enum.map(fn line ->
+    line |> String.split("", trim: true) |> Enum.map(&String.to_integer/1)
+  end)
+
+Enum.zip(0..length(tree_heights), tree_heights)
+|> Enum.map(fn {row, line} ->
+  Enum.zip(0..length(line), line)
+  |> Enum.map(fn {col, _} ->
+    Day8.tree_is_visible(tree_heights, col, row)
+  end)
+end)
+|> Enum.map(fn row ->
+  row
+  |> Enum.count(fn elem -> elem end)
+end)
+|> Enum.sum()
+```
+
+## Part 2
+
+```elixir
+tree_heights =
+  input
+  |> Kino.Input.read()
+  |> String.split("\n", trim: true)
+  |> Enum.map(fn line ->
+    line |> String.split("", trim: true) |> Enum.map(&String.to_integer/1)
+  end)
+
+Enum.zip(0..length(tree_heights), tree_heights)
+|> Enum.map(fn {row, line} ->
+  Enum.zip(0..length(line), line)
+  |> Enum.map(fn {col, _} ->
+    Day8.calculate_scenic_score(tree_heights, col, row)
+  end)
+end)
+|> Enum.map(fn line ->
+  line
+  |> Enum.max()
+end)
+|> Enum.max()
+```
