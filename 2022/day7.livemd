@@ -1,0 +1,224 @@
+# Day 7
+
+```elixir
+Mix.install([{:kino, "~>0.7.0"}])
+```
+
+## Setup
+
+```elixir
+input = Kino.Input.textarea("Input file")
+```
+
+## Common
+
+```elixir
+defmodule Day7 do
+  defmodule Directory do
+    defstruct directories: %{}, total_size: 0, file_sizes: %{}
+
+    def new() do
+      %Directory{}
+    end
+
+    def add_file(self, current_dir, file_name, file_size) do
+      parsed_dir = current_dir |> String.split("/", trim: true)
+
+      add_file_in(self, parsed_dir, file_name, file_size)
+    end
+
+    def add_directory(self, current_dir, dir_name) do
+      parsed_dir =
+        current_dir
+        |> String.split("/", trim: true)
+
+      add_directory_in(self, parsed_dir, dir_name)
+    end
+
+    # private methods
+    defp add_file_in(self, [], file_name, file_size) do
+      %{self | file_sizes: Map.put(self.file_sizes, file_name, file_size)}
+    end
+
+    defp add_file_in(self, location, file_name, file_size) do
+      [dir | location_without_last] = location
+
+      directory_to_change = self.directories[dir]
+
+      %{
+        self
+        | total_size: 0,
+          directories:
+            Map.put(
+              self.directories,
+              dir,
+              add_file_in(directory_to_change, location_without_last, file_name, file_size)
+            )
+      }
+    end
+
+    defp add_directory_in(self, [], dir_name) do
+      %{self | directories: Map.put(self.directories, dir_name, Directory.new())}
+    end
+
+    defp add_directory_in(self, location, dir_name) do
+      [dir | location_without_last] = location
+
+      directory_to_change = self.directories[dir]
+
+      %{
+        self
+        | directories:
+            Map.put(
+              self.directories,
+              dir,
+              add_directory_in(directory_to_change, location_without_last, dir_name)
+            )
+      }
+    end
+  end
+
+  def process_command(fs_information, "$ ls") do
+    # This is a noop
+    fs_information
+  end
+
+  def process_command(%{:fs => fs}, "$ cd /") do
+    # go to root directory
+    %{current_dir: "/", fs: fs}
+  end
+
+  def process_command(%{:current_dir => dir, :fs => fs}, "$ cd ..") do
+    # go up one directory
+    new_dir =
+      dir
+      |> String.split(~r/\//, include_captures: true, trim: true)
+      |> Enum.drop(-2)
+      |> Enum.join("")
+
+    %{current_dir: new_dir, fs: fs}
+  end
+
+  def process_command(%{:current_dir => dir, :fs => fs}, "$ cd " <> move_action) do
+    # go inside a directory
+    %{current_dir: dir <> move_action <> "/", fs: fs}
+  end
+
+  def process_command(%{:current_dir => dir, :fs => fs}, "dir " <> dir_name) do
+    # This is a dir command...Adding the directory to the correct location
+    new_fs = Directory.add_directory(fs, dir, dir_name)
+
+    %{current_dir: dir, fs: new_fs}
+  end
+
+  def process_command(%{:current_dir => dir, :fs => fs}, file_info) do
+    # This is a line with a file information
+    [file_size, file_name] =
+      file_info
+      |> String.split(" ", trim: true)
+
+    # new_fs = Directory.add_file(fs, dir, file_name, String.to_integer(file_size))
+    new_fs = Directory.add_file(fs, dir, file_name, String.to_integer(file_size))
+    %{current_dir: dir, fs: new_fs}
+  end
+
+  def calculate_size_for_directories(%{:current_dir => _, fs: fs}) do
+    fs
+    |> calculate_file_size()
+  end
+
+  def get_dir_sizes(fs) do
+    [{"/", fs.total_size}] ++ get_directories_dir_sizes(fs.directories)
+  end
+
+  # Private methods
+  def get_directories_dir_sizes(dir_map) when dir_map == %{} do
+    []
+  end
+
+  def get_directories_dir_sizes(dir_map) do
+    dir_map
+    |> Enum.reduce([], fn {key, dir}, acc ->
+      acc ++ [{key, dir.total_size}] ++ get_directories_dir_sizes(dir.directories)
+    end)
+  end
+
+  defp calculate_file_size(fs) when fs == %{} do
+    %{}
+  end
+
+  defp calculate_file_size(fs) do
+    file_size =
+      fs.file_sizes
+      |> Enum.reduce(0, fn {_, size}, acc -> acc + size end)
+
+    directories =
+      fs.directories
+      |> Enum.reduce(%{}, fn {dir_name, dir}, acc ->
+        Map.put(acc, dir_name, calculate_file_size(dir))
+      end)
+
+    dir_size =
+      directories
+      |> Enum.reduce(0, fn {_, dir}, acc ->
+        acc + dir.total_size
+      end)
+
+    %{fs | total_size: file_size + dir_size, directories: directories}
+  end
+end
+```
+
+## Part 1
+
+```elixir
+input
+|> Kino.Input.read()
+|> String.split("\n", trim: true)
+|> Enum.reduce(%{current_dir: "/", fs: Day7.Directory.new()}, fn command, acc ->
+  acc
+  |> Day7.process_command(command)
+end)
+|> Day7.calculate_size_for_directories()
+|> Day7.get_dir_sizes()
+|> Enum.filter(fn {_, val} ->
+  val <= 100_000
+end)
+|> Enum.map(fn {_, val} -> val end)
+|> Enum.sum()
+```
+
+## Part 2
+
+Total Disk Size: 70.000.000
+
+Needed unused Space: 30.000.000
+
+```elixir
+dir_sizes =
+  input
+  |> Kino.Input.read()
+  |> String.split("\n", trim: true)
+  |> Enum.reduce(%{current_dir: "/", fs: Day7.Directory.new()}, fn command, acc ->
+    acc
+    |> Day7.process_command(command)
+  end)
+  |> Day7.calculate_size_for_directories()
+  |> Day7.get_dir_sizes()
+
+# Find used size by root directory
+{_, size} =
+  dir_sizes
+  |> Enum.find(fn {dir, _} -> dir == "/" end)
+
+space_total = 70_000_000
+free_space_required = 30_000_000
+free_space = 70_000_000 - size
+space_to_free_up = free_space_required - free_space
+
+dir_sizes
+|> Enum.map(fn {_, size} -> size end)
+|> Enum.filter(fn size -> size >= space_to_free_up end)
+|> Enum.sort(fn size1, size2 -> size1 <= size2 end)
+|> Enum.min()
+```
