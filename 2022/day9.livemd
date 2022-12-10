@@ -1,0 +1,289 @@
+# Day 9
+
+```elixir
+Mix.install([{:kino, "~>0.7.0"}])
+```
+
+## Setup
+
+```elixir
+input = Kino.Input.textarea("input file")
+```
+
+## Common
+
+```elixir
+defmodule Day9 do
+  def count_uniq_steps(list_of_steps) do
+    list_of_steps
+    |> MapSet.new()
+    |> MapSet.to_list()
+    |> Enum.count()
+  end
+
+  def process_movement(state, {direction, units}) do
+    new_state =
+      1..units
+      |> Enum.reduce(state, fn _, acc ->
+        new_head_position = move_head(acc.head_position, direction)
+
+        {new_tail_position, new_tail_history} =
+          calculate_new_tail_position_and_movements(
+            acc.tail_position,
+            acc.tail_history,
+            new_head_position
+          )
+
+        %{
+          head_position: new_head_position,
+          tail_position: new_tail_position,
+          tail_history: new_tail_history
+        }
+      end)
+
+    new_state
+  end
+
+  def process_movement_part_2(state, {direction, units}) do
+    new_state =
+      1..units
+      |> Enum.reduce(state, fn _, acc ->
+        new_head_position = move_head(acc.knots_positions[0], direction)
+        knots_positions = %{acc.knots_positions | 0 => new_head_position}
+
+        new_knots_positions =
+          1..9
+          |> Enum.reduce(knots_positions, fn knot_position, acc ->
+            new_position = calculate_new_position(acc[knot_position], acc[knot_position - 1])
+
+            Map.put(acc, knot_position, new_position)
+          end)
+
+        # Get last element to store as history
+        tail_position = new_knots_positions[9]
+
+        %{
+          acc
+          | knots_positions: new_knots_positions,
+            tail_history: [tail_position | acc.tail_history]
+        }
+      end)
+
+    new_state
+  end
+
+  # Private methods
+  defp move_head({x, y}, "R"), do: {x + 1, y}
+  defp move_head({x, y}, "L"), do: {x - 1, y}
+  defp move_head({x, y}, "U"), do: {x, y + 1}
+  defp move_head({x, y}, "D"), do: {x, y - 1}
+
+  defp calculate_new_position({tail_x, tail_y}, {head_x, head_y})
+       when tail_x == head_x and tail_y == head_y do
+    {tail_x, tail_y}
+  end
+
+  defp calculate_new_position({tail_x, tail_y}, {head_x, head_y})
+       when abs(tail_x - head_x) <= 1 and tail_y == head_y do
+    {tail_x, tail_y}
+  end
+
+  defp calculate_new_position({tail_x, tail_y}, {head_x, head_y})
+       when tail_x == head_x and abs(tail_y - head_y) <= 1 do
+    {tail_x, tail_y}
+  end
+
+  defp calculate_new_position({tail_x, tail_y}, {head_x, head_y})
+       when abs(tail_x - head_x) <= 1 and abs(tail_y - head_y) <= 1 do
+    {tail_x, tail_y}
+  end
+
+  defp calculate_new_position({tail_x, tail_y}, {head_x, head_y})
+       when abs(tail_x - head_x) == 2 and tail_y == head_y do
+    case tail_x > head_x do
+      true ->
+        new_tail = {tail_x - 1, tail_y}
+        new_tail
+
+      false ->
+        new_tail = {tail_x + 1, tail_y}
+        new_tail
+    end
+  end
+
+  defp calculate_new_position({tail_x, tail_y}, {head_x, head_y})
+       when tail_x == head_x and abs(tail_y - head_y) == 2 do
+    case tail_y > head_y do
+      true ->
+        new_tail = {tail_x, tail_y - 1}
+        new_tail
+
+      false ->
+        new_tail = {tail_x, tail_y + 1}
+        new_tail
+    end
+  end
+
+  defp calculate_new_position({tail_x, tail_y}, {head_x, head_y}) do
+    # Implement tail move when distance is > 2 in both directions
+    diagonal_1 = {tail_x + 1, tail_y + 1}
+    diagonal_2 = {tail_x + 1, tail_y - 1}
+    diagonal_3 = {tail_x - 1, tail_y + 1}
+    diagonal_4 = {tail_x - 1, tail_y - 1}
+
+    # find closest diagonal
+    new_tail =
+      [diagonal_1, diagonal_2, diagonal_3, diagonal_4]
+      |> Enum.find(fn diagonal ->
+        check_if_it_is_touching(diagonal, {head_x, head_y})
+      end)
+
+    new_tail
+  end
+
+  defp calculate_new_tail_position_and_movements({tail_x, tail_y}, tail_history, {head_x, head_y})
+       when tail_x == head_x and tail_y == head_y do
+    {{tail_x, tail_y}, tail_history}
+  end
+
+  defp calculate_new_tail_position_and_movements({tail_x, tail_y}, tail_history, {head_x, head_y})
+       when abs(tail_x - head_x) <= 1 and tail_y == head_y do
+    {{tail_x, tail_y}, tail_history}
+  end
+
+  defp calculate_new_tail_position_and_movements({tail_x, tail_y}, tail_history, {head_x, head_y})
+       when tail_x == head_x and abs(tail_y - head_y) <= 1 do
+    {{tail_x, tail_y}, tail_history}
+  end
+
+  defp calculate_new_tail_position_and_movements({tail_x, tail_y}, tail_history, {head_x, head_y})
+       when abs(tail_x - head_x) <= 1 and abs(tail_y - head_y) <= 1 do
+    {{tail_x, tail_y}, tail_history}
+  end
+
+  defp calculate_new_tail_position_and_movements({tail_x, tail_y}, tail_history, {head_x, head_y})
+       when abs(tail_x - head_x) == 2 and tail_y == head_y do
+    case tail_x > head_x do
+      true ->
+        new_tail = {tail_x - 1, tail_y}
+        {new_tail, [new_tail | tail_history]}
+
+      false ->
+        new_tail = {tail_x + 1, tail_y}
+        {new_tail, [new_tail | tail_history]}
+    end
+  end
+
+  defp calculate_new_tail_position_and_movements({tail_x, tail_y}, tail_history, {head_x, head_y})
+       when tail_x == head_x and abs(tail_y - head_y) == 2 do
+    case tail_y > head_y do
+      true ->
+        new_tail = {tail_x, tail_y - 1}
+        {new_tail, [new_tail | tail_history]}
+
+      false ->
+        new_tail = {tail_x, tail_y + 1}
+        {new_tail, [new_tail | tail_history]}
+    end
+  end
+
+  defp calculate_new_tail_position_and_movements({tail_x, tail_y}, tail_history, {head_x, head_y}) do
+    # Implement tail move when distance is > 2 in both directions
+    diagonal_1 = {tail_x + 1, tail_y + 1}
+    diagonal_2 = {tail_x + 1, tail_y - 1}
+    diagonal_3 = {tail_x - 1, tail_y + 1}
+    diagonal_4 = {tail_x - 1, tail_y - 1}
+
+    # find closer diagonal
+    new_tail =
+      [diagonal_1, diagonal_2, diagonal_3, diagonal_4]
+      |> Enum.find(fn diagonal ->
+        check_if_it_is_touching(diagonal, {head_x, head_y})
+      end)
+
+    {new_tail, [new_tail | tail_history]}
+  end
+
+  defp check_if_it_is_touching({x, y}, {other_x, other_y}) when x == other_x and y == other_y,
+    do: true
+
+  defp check_if_it_is_touching({x, y}, {other_x, other_y})
+       when abs(x - other_x) <= 1 and y == other_y,
+       do: true
+
+  defp check_if_it_is_touching({x, y}, {other_x, other_y})
+       when x == other_x and abs(y - other_y) <= 1,
+       do: true
+
+  defp check_if_it_is_touching({x, y}, {other_x, other_y})
+       when abs(x - other_x) <= 1 and abs(y - other_y) <= 1,
+       do: true
+
+  defp check_if_it_is_touching(_, _), do: false
+end
+```
+
+## Part 1
+
+```elixir
+input
+|> Kino.Input.read()
+|> String.split("\n", trim: true)
+|> Enum.map(fn movement ->
+  movement
+  |> String.split(" ")
+  |> List.to_tuple()
+  |> then(fn {move, length_str} -> {move, String.to_integer(length_str)} end)
+end)
+|> Enum.reduce(
+  %{head_position: {0, 0}, tail_position: {0, 0}, tail_history: [{0, 0}]},
+  fn {direction, units}, acc ->
+    acc
+    |> Day9.process_movement({direction, units})
+  end
+)
+|> then(fn val ->
+  Enum.reverse(val.tail_history)
+end)
+|> Day9.count_uniq_steps()
+```
+
+## Part 2
+
+```elixir
+# 0 is HEAD
+# 9 is TAIL
+knots_start_positions = %{
+  0 => {0, 0},
+  1 => {0, 0},
+  2 => {0, 0},
+  3 => {0, 0},
+  4 => {0, 0},
+  5 => {0, 0},
+  6 => {0, 0},
+  7 => {0, 0},
+  8 => {0, 0},
+  9 => {0, 0}
+}
+
+input
+|> Kino.Input.read()
+|> String.split("\n", trim: true)
+|> Enum.map(fn movement ->
+  movement
+  |> String.split(" ")
+  |> List.to_tuple()
+  |> then(fn {move, length_str} -> {move, String.to_integer(length_str)} end)
+end)
+|> Enum.reduce(
+  %{knots_positions: knots_start_positions, tail_history: [{0, 0}]},
+  fn {direction, units}, acc ->
+    acc
+    |> Day9.process_movement_part_2({direction, units})
+  end
+)
+|> then(fn val ->
+  val.tail_history
+end)
+|> Day9.count_uniq_steps()
+```
