@@ -1,0 +1,141 @@
+# Day 10
+
+```elixir
+Mix.install([{:kino, "~>0.7.0"}])
+```
+
+## Section
+
+```elixir
+input = Kino.Input.textarea("file input")
+```
+
+## Part 1
+
+```elixir
+# noop takes 1 cycle
+# addx takes 2 cycle (process the increment of X once the cycle is finished)
+defmodule Day10 do
+  def process_command(%{:x => x, :cycle => cycle}, "noop") do
+    %{x: x, cycle: cycle + 1}
+  end
+
+  def process_command(%{:x => x, :cycle => cycle}, "addx " <> num_str) do
+    %{x: x + String.to_integer(num_str), cycle: cycle + 2}
+  end
+
+  def do_calculations(_, [], _, _) do
+    %{remaining_cycles_to_check: [], strength_value: 0}
+  end
+
+  def do_calculations(
+        current_cycle,
+        [cycle_to_check | remaining_cycles_to_check],
+        _x_during_cycle,
+        x_after_cycle
+      )
+      when current_cycle == cycle_to_check do
+    %{
+      remaining_cycles_to_check: remaining_cycles_to_check,
+      strength_value: cycle_to_check * x_after_cycle
+    }
+  end
+
+  def do_calculations(
+        current_cycle,
+        [cycle_to_check | remaining_cycles_to_check],
+        _x_during_cycle,
+        _x_after_cycle
+      )
+      when current_cycle < cycle_to_check do
+    %{remaining_cycles_to_check: [cycle_to_check | remaining_cycles_to_check], strength_value: 0}
+  end
+
+  def do_calculations(
+        _current_cycle,
+        [cycle_to_check | remaining_cycles_to_check],
+        x_during_cycle,
+        _x_after_cycle
+      ) do
+    %{
+      remaining_cycles_to_check: remaining_cycles_to_check,
+      strength_value: cycle_to_check * x_during_cycle
+    }
+  end
+end
+
+cycles_to_check = [20, 60, 100, 140, 180, 220]
+
+input
+|> Kino.Input.read()
+|> String.split("\n", trim: true)
+|> Enum.reduce(
+  %{x: 1, cycle: 1, remaining_cycles_to_check: cycles_to_check, signal_strength_sum: 0},
+  fn op, acc ->
+    %{:x => x, :cycle => cycle} = Day10.process_command(acc, op)
+
+    %{:remaining_cycles_to_check => new_cycles_to_check, :strength_value => strength_value} =
+      Day10.do_calculations(cycle, acc.remaining_cycles_to_check, acc.x, x)
+
+    %{
+      acc
+      | x: x,
+        cycle: cycle,
+        signal_strength_sum: acc.signal_strength_sum + strength_value,
+        remaining_cycles_to_check: new_cycles_to_check
+    }
+  end
+)
+```
+
+## Part 2
+
+```elixir
+# CRT: 40 wide 6 high
+
+defmodule Day10 do
+  def process_command(%{:x => x, :cycle => cycle}, "noop") do
+    %{x: x, cycle: cycle + 1}
+  end
+
+  def process_command(%{:x => x, :cycle => cycle}, "addx " <> num_str) do
+    %{x: x + String.to_integer(num_str), cycle: cycle + 2}
+  end
+end
+
+instructions =
+  input
+  |> Kino.Input.read()
+  |> String.split("\n", trim: true)
+  |> Enum.reduce(%{x: 1, cycle: 1, crt_screen: []}, fn op, acc ->
+    sprite_position = [acc.x - 1, acc.x, acc.x + 1]
+
+    %{:x => x, :cycle => cycle} = Day10.process_command(acc, op)
+
+    additional_crt_screen =
+      acc.cycle..(cycle - 1)
+      |> Enum.reduce([], fn c, acc ->
+        case Enum.member?(sprite_position, rem(c - 1, 40)) do
+          true ->
+            acc ++ ['#']
+
+          false ->
+            acc ++ ['.']
+        end
+      end)
+
+    %{x: x, cycle: cycle, crt_screen: acc.crt_screen ++ additional_crt_screen}
+  end)
+  |> then(fn val ->
+    val.crt_screen
+  end)
+  |> Enum.chunk_every(40)
+  |> Enum.map(fn line ->
+    line
+    |> Enum.map_join(fn
+      '#' -> IO.ANSI.format([:green_background, :green, "#"], true)
+      '.' -> IO.ANSI.format([:black_background, :black, "."], true)
+    end)
+  end)
+  |> Enum.each(&IO.puts/1)
+```
