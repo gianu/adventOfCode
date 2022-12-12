@@ -1,0 +1,178 @@
+# Day 11
+
+```elixir
+Mix.install([{:kino, "~>0.7.0"}])
+```
+
+## Setup
+
+```elixir
+input = Kino.Input.textarea("input file")
+```
+
+## Common
+
+```elixir
+defmodule Day11 do
+  def get_monkey_structure(data) do
+    data
+    |> Enum.map(fn monkey ->
+      monkey
+      |> String.split("\n", trim: true)
+      |> Enum.map(&String.trim/1)
+      |> Enum.reduce(
+        %{
+          monkey_id: -1,
+          items: [],
+          operation: "",
+          divisible_by: 1,
+          if_false_throw_to: -1,
+          if_true_throw_to: -1,
+          times_inspected_items: 0
+        },
+        fn data, acc -> parse_monkey_data(acc, data) end
+      )
+    end)
+    |> Enum.sort(fn first, second ->
+      first.monkey_id < second.monkey_id
+    end)
+    |> Stream.with_index(0)
+    |> Enum.reduce(%{}, fn {v, k}, acc -> Map.put(acc, k, v) end)
+  end
+
+  def play_round(monkeys, worry_factor \\ 3) do
+    monkeys
+    |> Enum.reduce(monkeys, fn {id, monkey_data}, acc ->
+      items_to_move =
+        acc[id].items
+        |> Enum.map(fn item ->
+          item
+          |> String.to_integer()
+          |> new_worry_level(acc[id].operation)
+          |> then(fn val ->
+            case worry_factor == 3 do
+              true ->
+                floor(val / 3)
+
+              false ->
+                rem(val, worry_factor)
+            end
+          end)
+          |> then(fn val ->
+            case rem(val, acc[id].divisible_by) do
+              0 ->
+                {acc[id].if_true_throw_to, val}
+
+              _ ->
+                {acc[id].if_false_throw_to, val}
+            end
+          end)
+        end)
+
+      new_monkey_data = %{
+        monkey_data
+        | items: [],
+          times_inspected_items: monkey_data.times_inspected_items + length(items_to_move)
+      }
+
+      updated_monkeys =
+        items_to_move
+        |> Enum.reduce(acc, fn {to, item}, acc ->
+          new_monkey = %{acc[to] | items: acc[to].items ++ [Integer.to_string(item)]}
+
+          acc
+          |> Map.put(to, new_monkey)
+        end)
+
+      updated_monkeys
+      |> Map.put(id, new_monkey_data)
+    end)
+  end
+
+  # Private methods
+  defp new_worry_level(current_worry_level, "new = old * old") do
+    current_worry_level * current_worry_level
+  end
+
+  defp new_worry_level(current_worry_level, "new = old * " <> number) do
+    current_worry_level * String.to_integer(number)
+  end
+
+  defp new_worry_level(current_worry_level, "new = old + " <> number) do
+    current_worry_level + String.to_integer(number)
+  end
+
+  defp parse_monkey_data(monkey_data, "Monkey " <> monkey_id) do
+    %{monkey_data | monkey_id: monkey_id |> String.replace(":", "") |> String.to_integer()}
+  end
+
+  defp parse_monkey_data(monkey_data, "Starting items: " <> items) do
+    %{monkey_data | items: items |> String.split(",", trim: true) |> Enum.map(&String.trim/1)}
+  end
+
+  defp parse_monkey_data(monkey_data, "Operation: " <> operation) do
+    %{monkey_data | operation: operation}
+  end
+
+  defp parse_monkey_data(monkey_data, "Test: divisible by " <> divisible_by) do
+    %{monkey_data | divisible_by: String.to_integer(divisible_by)}
+  end
+
+  defp parse_monkey_data(monkey_data, "If false: throw to monkey " <> if_false_throw_to) do
+    %{monkey_data | if_false_throw_to: String.to_integer(if_false_throw_to)}
+  end
+
+  defp parse_monkey_data(monkey_data, "If true: throw to monkey " <> if_true_throw_to) do
+    %{monkey_data | if_true_throw_to: String.to_integer(if_true_throw_to)}
+  end
+end
+```
+
+## Part 1
+
+```elixir
+monkeys =
+  input
+  |> Kino.Input.read()
+  |> String.split("\n\n", trim: true)
+  |> Day11.get_monkey_structure()
+
+1..20
+|> Enum.reduce(monkeys, fn _, acc ->
+  acc
+  |> Day11.play_round()
+end)
+|> Enum.map(fn {_, item} -> item.times_inspected_items end)
+|> Enum.sort(&(&1 >= &2))
+|> Enum.take(2)
+|> then(fn [first, second] ->
+  first * second
+end)
+```
+
+## Part 2
+
+```elixir
+monkeys =
+  input
+  |> Kino.Input.read()
+  |> String.split("\n\n", trim: true)
+  |> Day11.get_monkey_structure()
+
+divisible_by =
+  monkeys
+  |> Enum.map(fn {_, monkey} -> monkey.divisible_by end)
+  |> Enum.reduce(1, fn val, acc -> val * acc end)
+
+1..10_000
+|> Enum.reduce(monkeys, fn _round, acc ->
+  acc
+  |> Day11.play_round(divisible_by)
+end)
+|> Enum.map(fn {_, item} -> item.times_inspected_items end)
+|> Enum.sort(&(&1 >= &2))
+|> Enum.take(2)
+|> then(fn [first, second] ->
+  first * second
+end)
+```
