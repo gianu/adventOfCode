@@ -1,0 +1,140 @@
+# Day 12 - take 2
+
+```elixir
+Mix.install([:priority_queue, {:kino, "~>0.8.0"}])
+```
+
+## Setup
+
+```elixir
+input = Kino.Input.textarea("file input")
+```
+
+## Part 1
+
+```elixir
+map =
+  input
+  |> Kino.Input.read()
+  |> String.split("\n", trim: true)
+  |> Enum.map(fn line ->
+    line
+    |> String.trim()
+    |> to_charlist()
+    |> Enum.with_index()
+  end)
+  |> Enum.with_index()
+  |> Enum.flat_map(fn {row, y} -> for {height, x} <- row, do: {{x, y}, height} end)
+  |> Map.new()
+```
+
+```elixir
+defmodule Day12 do
+  def prepare_map(input) do
+    {end_pos, ?E} = Enum.find(input, fn {_, h} -> h == ?E end)
+    {start_pos, ?S} = Enum.find(input, fn {_, h} -> h == ?S end)
+
+    map =
+      input
+      |> Map.put(end_pos, ?z)
+      |> Map.put(start_pos, ?a)
+
+    edges =
+      for {pos, _} <- map, into: %{} do
+        {pos, valid_edges(pos, map)}
+      end
+
+    {end_pos, start_pos, edges}
+  end
+
+  def distances(start, edges) do
+    find_path(start, edges, MapSet.new(), Map.new([{start, 0}]))
+  catch
+    {:done, distances} -> distances
+  end
+
+  def posible_directions(directions) do
+    directions
+    |> Enum.flat_map(fn {key, directions} ->
+      for option <- directions do
+        {option, key}
+      end
+    end)
+    |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+  end
+
+  # Private methods
+
+  @movements [{-1, 0}, {1, 0}, {0, -1}, {0, 1}]
+  defp valid_edges(pos, map) do
+    current_height = map[pos]
+
+    for movement <- @movements,
+        option = move(pos, movement),
+        map[option] <= current_height + 1 do
+      option
+    end
+  end
+
+  defp move({x, y}, {dx, dy}), do: {x + dx, y + dy}
+
+  defp find_path(pos, directions, visited, distances) do
+    posibles =
+      directions[pos]
+      |> Enum.reject(&MapSet.member?(visited, &1))
+
+    current_distance = Map.fetch!(distances, pos)
+
+    distances =
+      for posible <- posibles, reduce: distances do
+        distances ->
+          case Map.get(distances, posible, :infinity) do
+            :infinity ->
+              Map.put(distances, posible, current_distance + 1)
+
+            value when value < current_distance + 1 ->
+              Map.put(distances, posible, current_distance + 1)
+
+            _ ->
+              distances
+          end
+      end
+
+    visited = MapSet.put(visited, pos)
+
+    unvisited = Enum.reject(distances, fn {key, _} -> MapSet.member?(visited, key) end)
+
+    if unvisited == [] do
+      throw({:done, distances})
+    end
+
+    case Enum.min_by(unvisited, &elem(&1, 1)) do
+      {_, :infinity} ->
+        throw({:done, distances})
+
+      {next_node, _} ->
+        find_path(next_node, directions, visited, distances)
+    end
+  end
+end
+```
+
+## Part 1
+
+```elixir
+{finish, start, edges} = Day12.prepare_map(map)
+distances = Day12.distances(finish, Day12.posible_directions(edges))
+distances[start]
+```
+
+## Part 2
+
+```elixir
+{finish, start, edges} = Day12.prepare_map(map)
+distances = Day12.distances(finish, Day12.posible_directions(edges))
+
+map
+|> Enum.filter(fn {_, v} -> v == ?a end)
+|> Enum.map(&distances[elem(&1, 0)])
+|> Enum.min()
+```
