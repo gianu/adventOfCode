@@ -1,0 +1,94 @@
+# Day 13
+
+```elixir
+Mix.install([{:kino, "~>0.8.0"}])
+```
+
+## Setup
+
+```elixir
+input = Kino.Input.textarea("input file")
+```
+
+## Common
+
+```elixir
+defmodule Day13 do
+  def parse_list(list) do
+    [a, b] =
+      list
+      |> String.split("\n", trim: true)
+
+    [elem(Code.eval_string(a), 0), elem(Code.eval_string(b), 0)]
+    |> List.to_tuple()
+  end
+
+  def compare([], []), do: nil
+  def compare([_ | _], []), do: false
+  def compare([], [_ | _]), do: true
+
+  def compare([x | left_rest], [y | right_rest]) when is_integer(x) and is_integer(y) do
+    cond do
+      x < y -> true
+      x > y -> false
+      x == y -> compare(left_rest, right_rest)
+    end
+  end
+
+  def compare([x | left_rest], [y | right_rest]) when is_list(x) and is_list(y) do
+    case compare(x, y) do
+      nil -> compare(left_rest, right_rest)
+      val -> val
+    end
+  end
+
+  def compare([x | left_rest], [y | right_rest]) when is_list(x) and is_integer(y) do
+    compare([x | left_rest], [[y] | right_rest])
+  end
+
+  def compare([x | left_rest], [y | right_rest]) when is_integer(x) and is_list(y) do
+    compare([[x] | left_rest], [y | right_rest])
+  end
+end
+```
+
+## Part 1
+
+```elixir
+data =
+  input
+  |> Kino.Input.read()
+  |> String.split("\n\n", trim: true)
+  |> Enum.map(fn pair ->
+    pair |> Day13.parse_list()
+  end)
+  |> Enum.with_index(1)
+
+data
+|> Enum.map(fn {{left, right}, idx} ->
+  {idx, Day13.compare(left, right)}
+end)
+|> Enum.filter(fn {_, val} -> val end)
+|> Enum.map(fn {idx, _} -> idx end)
+|> Enum.sum()
+```
+
+## Part 2
+
+```elixir
+data =
+  input
+  |> Kino.Input.read()
+  |> String.split("\n\n")
+  |> Enum.flat_map(&String.split(&1, "\n"))
+  |> Enum.map(&elem(Code.eval_string(&1), 0))
+
+[[[2]], [[6]] | data]
+|> Enum.sort_by(fn x -> x end, fn left, right ->
+  Day13.compare(left, right)
+end)
+|> Enum.with_index(1)
+|> Enum.filter(fn {element, _} -> element in [[[2]], [[6]]] end)
+|> Enum.map(fn {_, idx} -> idx end)
+|> Enum.product()
+```

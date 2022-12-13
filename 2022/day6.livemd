@@ -6,8 +6,6 @@ Mix.install([{:kino, "~>0.7.0"}])
 
 ## Setup
 
-
-
 ```elixir
 input = Kino.Input.textarea("File content")
 ```
