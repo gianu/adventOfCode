@@ -1,0 +1,98 @@
+# Day 14
+
+```elixir
+Mix.install([{:kino, "~>0.8.0"}, {:vega_lite, "~> 0.1.6"}, {:kino_vega_lite, "~> 0.1.7"}])
+alias VegaLite, as: Vl
+```
+
+## Setup
+
+```elixir
+input = Kino.Input.textarea("Input file")
+```
+
+## Common
+
+```elixir
+defmodule Day14 do
+  def fall(state, bottom, {x, y} = sand) do
+    if MapSet.member?(state, {500, 0}) do
+      nil
+    else
+      air = Enum.find([{x, y + 1}, {x - 1, y + 1}, {x + 1, y + 1}], &(!MapSet.member?(state, &1)))
+
+      case air do
+        nil -> {state, MapSet.put(state, sand)}
+        {_, y} when y > bottom -> nil
+        _ -> fall(state, bottom, air)
+      end
+    end
+  end
+end
+```
+
+## Part 1
+
+```elixir
+# Get all points where there are rocks
+rock_map =
+  input
+  |> Kino.Input.read()
+  |> String.split("\n", trim: true)
+  |> Enum.flat_map(fn line ->
+    line
+    |> String.split(~r/\D+/, trim: true)
+    |> Enum.map(&String.to_integer/1)
+    |> Enum.chunk_every(2)
+    |> Enum.chunk_every(2, 1, :discard)
+    |> Enum.flat_map(fn [[a, b], [c, d]] ->
+      for x <- a..c, y <- b..d, do: {x, y}
+    end)
+  end)
+  |> MapSet.new()
+
+# Sand pouring from {500, 0}
+sand_point = {500, 0}
+
+bottom = Enum.max_by(rock_map, &elem(&1, 1)) |> elem(1)
+Stream.unfold(rock_map, &Day14.fall(&1, bottom, sand_point)) |> Enum.to_list() |> Enum.count()
+```
+
+## Part 2
+
+```elixir
+rock_map =
+  input
+  |> Kino.Input.read()
+  |> String.split("\n", trim: true)
+  |> Enum.flat_map(fn line ->
+    line
+    |> String.split(~r/\D+/, trim: true)
+    |> Enum.map(&String.to_integer/1)
+    |> Enum.chunk_every(2)
+    |> Enum.chunk_every(2, 1, :discard)
+    |> Enum.flat_map(fn [[a, b], [c, d]] ->
+      for x <- a..c, y <- b..d, do: {x, y}
+    end)
+  end)
+  |> MapSet.new()
+
+# Sand pouring from {500, 0}
+sand_point = {500, 0}
+
+bottom =
+  rock_map
+  |> Enum.max_by(fn {_, y} -> y end)
+  |> then(fn {_, y} -> y end)
+  # Get position of bottom
+  |> then(fn val -> val + 2 end)
+
+state =
+  (-bottom - 1)..(bottom + 1)
+  |> Enum.map(fn y ->
+    {500 + y, bottom}
+  end)
+  |> Enum.into(rock_map)
+
+Stream.unfold(state, &Day14.fall(&1, bottom, {500, 0})) |> Enum.count()
+```
