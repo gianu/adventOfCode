@@ -156,75 +156,11 @@ initial_position
 |> PathFinder_2.find_path(available_minutes, distances, valves_map)
 ```
 
-## Part 2
-
-```elixir
-# initial_position = "AA"
-# available_minutes = 26
-
-# valves_map = input 
-# |> Kino.Input.read()
-# |> String.split("\n", trim: true)
-# |> Enum.map(fn valve_description -> 
-#   Day16_2.parse_line(valve_description)
-# end)
-# |> Map.new()
-
-# graph = :digraph.new()
-
-# for valve <- Map.keys(valves_map) do
-#   :digraph.add_vertex(graph, valve)
-# end
-
-# for {valve, %{tunnels: tunnels}} <- valves_map,
-#     target_valve <- tunnels do
-#   :digraph.add_edge(graph, valve, target_valve)
-# end
-
-# non_zero_flow_rate_valves =
-#   valves_map
-#   |> Enum.filter(&match?({_valve, %{flow_rate: flow_rate}} when flow_rate > 0, &1))
-#   |> Enum.map(&elem(&1, 0))
-
-# distances =
-#   for origin <- ["AA" | non_zero_flow_rate_valves],
-#       target <- non_zero_flow_rate_valves,
-#       origin != target do
-#     path = :digraph.get_short_path(graph, origin, target)
-#     {origin, target, length(path) - 1}
-#   end
-#   |> Map.new(&{{elem(&1, 0), elem(&1, 1)}, elem(&1, 2)})
-
-# :digraph.delete(graph)
-
-# [{"AA", available_minutes}, {"AA", available_minutes}]
-# |> PathFinder_2.find_path_part_2(distances, valves_map, non_zero_flow_rate_valves)
-# |> IO.puts()
-```
-
 ## Part 2 - take 2
 
 ```elixir
 initial_position = "AA"
 available_minutes = 26
-
-# valves =
-#   IO.stream()
-#   |> Enum.map(
-#     &Regex.run(
-#       ~r/^Valve (?<valve>[A-Z]{2}) has flow rate=(?<flow_rate>\d+); tunnels? leads? to valves? (?<tunnels>([A-Z]{2})(, [A-Z]{2})*)/,
-#       &1,
-#       capture: ["valve", "flow_rate", "tunnels"]
-#     )
-#   )
-#   |> Map.new(fn [valve, flow_rate, tunnels] ->
-#     {valve,
-#      %{
-#        valve: valve,
-#        flow_rate: String.to_integer(flow_rate),
-#        tunnels: String.split(tunnels, ", ")
-#      }}
-#   end)
 
 valves =
   input
