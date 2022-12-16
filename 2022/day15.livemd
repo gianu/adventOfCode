@@ -1,0 +1,112 @@
+# Day 15
+
+```elixir
+Mix.install([{:kino, "~>0.8.0"}])
+```
+
+## Setup
+
+```elixir
+input = Kino.Input.textarea("input file")
+```
+
+## Part 1 - take 4
+
+```elixir
+defmodule Day15_4 do
+  def parse_line(line) do
+    ~r/(?<=[xy]=)[^,:\s]+/
+    |> Regex.scan(line)
+    |> List.flatten()
+    |> Enum.map(&String.to_integer/1)
+    |> then(fn [xs, ys, xb, yb] ->
+      [{{xs, ys}, {:sensor, manhattan({xs, ys}, {xb, yb})}}, {{xb, yb}, :beacon}]
+    end)
+  end
+
+  def ranges(sensors, y) do
+    sensors
+    |> Stream.reject(fn {{_xc, yc}, {:sensor, radius}} ->
+      abs(y - yc) > radius
+    end)
+    |> Stream.map(fn {{xc, yc}, {:sensor, radius}} ->
+      (xc - (radius - abs(y - yc)))..(xc + (radius - abs(y - yc)))
+    end)
+    |> merge_ranges()
+  end
+
+  # Private methods
+  defp manhattan({x1, y1}, {x2, y2}) do
+    abs(x1 - x2) + abs(y1 - y2)
+  end
+
+  defp merge_ranges(ranges) do
+    [h | t] = Enum.sort(ranges)
+    do_merge(t, [h])
+  end
+
+  defp do_merge([_s2..e2 = r2 | t2], [s1..e1 = r1 | t1] = acc) do
+    if Range.disjoint?(r1, r2) do
+      do_merge(t2, [r2 | acc])
+    else
+      do_merge(t2, [s1..max(e1, e2) | t1])
+    end
+  end
+
+  defp do_merge([], acc), do: acc
+end
+
+{:ok, stream} =
+  input
+  |> Kino.Input.read()
+  |> StringIO.open()
+
+information =
+  stream
+  |> IO.binstream(:line)
+  |> Stream.flat_map(&Day15_4.parse_line/1)
+  |> Map.new()
+
+sensors = Enum.filter(information, &match?({_, {:sensor, _}}, &1))
+ranges = Day15_4.ranges(sensors, 2_000_000)
+
+covered =
+  ranges
+  |> Enum.map(fn s..e ->
+    e - s + 1
+  end)
+  |> Enum.sum()
+
+beacons =
+  Enum.count(information, fn {{_, yb}, type} ->
+    type == :beacon and yb == 2_000_000
+  end)
+
+covered - beacons
+```
+
+## Part 2
+
+```elixir
+{:ok, stream} =
+  input
+  |> Kino.Input.read()
+  |> StringIO.open()
+
+information =
+  stream
+  |> IO.binstream(:line)
+  |> Stream.flat_map(&Day15_4.parse_line/1)
+  |> Map.new()
+
+sensors = Enum.filter(information, &match?({_, {:sensor, _}}, &1))
+
+{y, ranges} =
+  0..4_000_000
+  |> Stream.map(&{&1, Day15_4.ranges(sensors, &1)})
+  |> Enum.find(&match?({_, [_, _]}, &1))
+
+[_..x1, x2.._] = Enum.sort(ranges)
+
+div(x1 + x2, 2) * 4_000_000 + y
+```
