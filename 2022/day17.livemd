@@ -1,0 +1,309 @@
+# Day 17
+
+```elixir
+Mix.install([{:kino, "~>0.8.0"}])
+```
+
+## Setup
+
+```elixir
+input = Kino.Input.textarea("input file")
+```
+
+## Common
+
+```elixir
+defmodule Day17 do
+  def move_piece_until_settled(map, piece, jet_streams) do
+    %{:map => new_map, :piece => settled_piece, :jet_streams => remaining_jet_streams} =
+      do_move_piece_until_settled(map, piece, jet_streams)
+
+    %{
+      map: new_map,
+      piece_settled_position: settled_piece,
+      remaining_jet_streams: remaining_jet_streams
+    }
+  end
+
+  def normalize_map(map) do
+    # Get max y for each x
+    map
+    |> Enum.group_by(fn {x, _y} -> x end)
+    |> Enum.map(fn {k, v} ->
+      {k,
+       v
+       |> Enum.max_by(fn {_x, y} -> y end)}
+    end)
+    |> Map.new()
+    |> Map.new()
+    |> Enum.map(fn {_k, v} -> v end)
+    |> then(fn map ->
+      floor = 1..7 |> Enum.map(fn x -> {x, 0} end)
+      map ++ floor
+    end)
+  end
+
+  # Private methods
+  defp do_move_piece_until_settled(map, piece, jet_streams) do
+    {settled, {new_map, new_piece, new_jet_streams}} =
+      {map, piece, jet_streams}
+      |> do_move_piece_for_jet_stream()
+      |> do_move_piece_down()
+
+    case settled do
+      true ->
+        %{map: new_map, piece: new_piece, jet_streams: new_jet_streams}
+
+      false ->
+        do_move_piece_until_settled(new_map, new_piece, new_jet_streams)
+    end
+  end
+
+  defp do_move_piece_for_jet_stream({map, piece, jet_streams}) do
+    {:next, movement, remaining_jet_streams} = StreamIterator.Suspension.next(jet_streams)
+    # [movement | remaining_jet_streams] = jet_streams
+
+    new_piece_pos = do_move_piece(movement, map, piece)
+
+    {map, new_piece_pos, remaining_jet_streams}
+  end
+
+  defp do_move_piece_down({map, piece, jet_streams}) do
+    new_piece =
+      piece
+      |> Enum.map(fn {x, y} ->
+        {x, y - 1}
+      end)
+
+    # Check for collision
+    collision = has_intersection(map, new_piece)
+
+    case collision do
+      true ->
+        {true, {map ++ piece, piece, jet_streams}}
+
+      false ->
+        {false, {map, new_piece, jet_streams}}
+    end
+  end
+
+  defp do_move_piece(">", map, piece) do
+    new_piece =
+      piece
+      |> Enum.map(fn {x, y} ->
+        {x + 1, y}
+      end)
+
+    max_x = new_piece |> Enum.map(fn {x, _} -> x end) |> Enum.max()
+    # Check for collision
+    collision = has_intersection(map, new_piece)
+
+    case max_x >= 8 || collision do
+      true ->
+        piece
+
+      false ->
+        new_piece
+    end
+  end
+
+  defp do_move_piece("<", map, piece) do
+    new_piece =
+      piece
+      |> Enum.map(fn {x, y} ->
+        {x - 1, y}
+      end)
+
+    min_x = new_piece |> Enum.map(fn {x, _} -> x end) |> Enum.min()
+    # Check for collision
+    collision = has_intersection(map, new_piece)
+
+    case min_x <= 0 || collision do
+      true ->
+        piece
+
+      false ->
+        new_piece
+    end
+  end
+
+  def has_intersection(list_1, list_2) do
+    list_3 = list_1 -- list_2
+    final_list = list_1 -- list_3
+
+    length(final_list) > 0
+  end
+end
+
+# Good abstraction to get stream elements one by one.
+# Found here: https://elixirforum.com/t/best-way-to-iterate-a-stream/24382/17
+defmodule StreamIterator.Suspension do
+  defstruct continuation: nil
+
+  def start(stream) do
+    reduce_fun = fn item, _acc -> {:suspend, item} end
+    {:suspended, nil, continuation} = Enumerable.reduce(stream, {:suspend, nil}, reduce_fun)
+    %__MODULE__{continuation: continuation}
+  end
+
+  def next(state)
+
+  def next(%{continuation: nil} = state) do
+    {:eof, state}
+  end
+
+  def next(state) do
+    case state.continuation.({:cont, nil}) do
+      {:suspended, item, continuation} -> {:next, item, %{state | continuation: continuation}}
+      {:halted, item} -> {item, %{state | continuation: nil}}
+      {:done, nil} -> {:eof, %{state | continuation: nil}}
+    end
+  end
+end
+```
+
+## Part 1
+
+```elixir
+movements =
+  input
+  |> Kino.Input.read()
+  |> String.split("", trim: true)
+
+shape_1 = fn init_pos_x, init_pos_y ->
+  # Shape
+  # ####
+  # 
+  # init_pos_x is the leftmost position
+  # init_post_y is the lowest position
+  [
+    {init_pos_x, init_pos_y},
+    {init_pos_x + 1, init_pos_y},
+    {init_pos_x + 2, init_pos_y},
+    {init_pos_x + 3, init_pos_y}
+  ]
+end
+
+shape_2 = fn init_pos_x, init_pos_y ->
+  # Shape
+  # .#.
+  # ###
+  # .#.
+  #
+  # init_pos_x is the leftmost position
+  # init_post_y is the lowest position
+  [
+    {init_pos_x, init_pos_y + 1},
+    {init_pos_x + 1, init_pos_y + 1},
+    {init_pos_x + 2, init_pos_y + 1},
+    {init_pos_x + 1, init_pos_y},
+    {init_pos_x + 1, init_pos_y + 2}
+  ]
+end
+
+shape_3 = fn init_pos_x, init_pos_y ->
+  # Shape
+  # ..#
+  # ..#
+  # ###
+  # init_pos_x is the leftmost position
+  # init_post_y is the lowest position
+  [
+    {init_pos_x, init_pos_y},
+    {init_pos_x + 1, init_pos_y},
+    {init_pos_x + 2, init_pos_y},
+    {init_pos_x + 2, init_pos_y + 1},
+    {init_pos_x + 2, init_pos_y + 2}
+  ]
+end
+
+shape_4 = fn init_pos_x, init_pos_y ->
+  # Shape
+  # #
+  # #
+  # #
+  # #
+  # init_pos_x is the leftmost position
+  # init_post_y is the lowest position
+  [
+    {init_pos_x, init_pos_y},
+    {init_pos_x, init_pos_y + 1},
+    {init_pos_x, init_pos_y + 2},
+    {init_pos_x, init_pos_y + 3}
+  ]
+end
+
+shape_5 = fn init_pos_x, init_pos_y ->
+  # Shape
+  # ##
+  # ##
+  # init_pos_x is the leftmost position
+  # init_post_y is the lowest position
+  [
+    {init_pos_x, init_pos_y},
+    {init_pos_x + 1, init_pos_y},
+    {init_pos_x, init_pos_y + 1},
+    {init_pos_x + 1, init_pos_y + 1}
+  ]
+end
+
+shapes = [shape_1, shape_2, shape_3, shape_4, shape_5]
+
+movements_stream = StreamIterator.Suspension.start(Stream.cycle(movements))
+shapes_stream = StreamIterator.Suspension.start(Stream.cycle(shapes))
+
+rocks_to_watch = 2022
+# rocks_to_watch = 1_000_000_000_000
+units_wide = 7
+y_wall_left = 0
+y_wall_right = 8
+starts_units_above = 3
+
+# (rocks_to_watch)
+# IO.inspect("before rocks")
+# rocks = shapes_stream |> Enum.take(1_000_000_000_000)
+# IO.inspect("after rocks")
+# jet_streams = movements_stream |> Enum.take(1_000_000_000_000_000)
+# IO.inspect("after jet streams")
+
+# This is the floor, {0,0} and {0,8} are walls
+map = 1..units_wide |> Enum.map(fn x -> {x, 0} end)
+highest_y = map |> Enum.map(fn {_x, y} -> y end) |> Enum.max()
+
+1..1_000_000_000_000
+|> Enum.reduce(
+  %{
+    count: 1,
+    map: map,
+    highest_y: highest_y,
+    jet_streams: movements_stream,
+    shapes_stream: shapes_stream
+  },
+  fn _, acc ->
+    IO.inspect(acc[:count])
+    {:next, rock_fn, new_shapes_stream} = StreamIterator.Suspension.next(acc[:shapes_stream])
+
+    rock_initial_pos = rock_fn.(3, acc[:highest_y] + 4)
+
+    %{
+      :map => new_map,
+      :piece_settled_position => settled_piece,
+      :remaining_jet_streams => remaining_jet_streams
+    } = Day17.move_piece_until_settled(acc[:map], rock_initial_pos, acc[:jet_streams])
+
+    normalized_map = Day17.normalize_map(new_map)
+
+    max_y_settled_piece = settled_piece |> Enum.map(fn {_, y} -> y end) |> Enum.max()
+
+    new_highest_y = [acc[:highest_y], max_y_settled_piece] |> Enum.max()
+
+    %{
+      count: acc[:count] + 1,
+      map: normalized_map,
+      highest_y: new_highest_y,
+      shapes_stream: new_shapes_stream,
+      jet_streams: remaining_jet_streams
+    }
+  end
+)
+```

@@ -1,0 +1,141 @@
+# Day 18
+
+```elixir
+Mix.install([{:kino, "~>0.8.0"}])
+```
+
+## Section
+
+```elixir
+input = Kino.Input.textarea("input file")
+```
+
+## Common
+
+```elixir
+defmodule Day18 do
+  def count_sides(cube, cubes) do
+    [{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}]
+    |> Enum.reduce(0, fn delta, acc ->
+      case MapSet.member?(cubes, new_position(cube, delta)) do
+        true -> acc
+        false -> acc + 1
+      end
+    end)
+  end
+
+  def new_position({x, y, z}, {dx, dy, dz}) do
+    {x + dx, y + dy, z + dz}
+  end
+end
+```
+
+## Part 1
+
+```elixir
+positions =
+  input
+  |> Kino.Input.read()
+  |> String.split("\n", trim: true)
+  |> Enum.map(fn coord ->
+    coord
+    |> String.split(",", trim: true)
+    |> Enum.map(&String.to_integer/1)
+    |> List.to_tuple()
+  end)
+
+cubes = MapSet.new(positions)
+
+cubes
+|> Enum.reduce(0, fn cube, acc ->
+  acc + Day18.count_sides(cube, cubes)
+end)
+```
+
+## Part 2
+
+```elixir
+defmodule CubeMath do
+  def invert(cubes) do
+    {mx, my, mz} = bounds(cubes)
+
+    for x <- -1..(mx + 1), y <- -1..(my + 1), z <- -1..(mz + 1), reduce: MapSet.new() do
+      empty ->
+        pos = {x, y, z}
+
+        if MapSet.member?(cubes, pos) do
+          empty
+        else
+          empty |> MapSet.put(pos)
+        end
+    end
+  end
+
+  def get_outer_area(cubes) do
+    get_connected_cubes({-1, -1, -1}, cubes)
+  end
+
+  # Private Methdos
+  defp bounds(cubes) do
+    for {x, y, z} <- cubes, reduce: {0, 0, 0} do
+      {mx, my, mz} -> {max(mx, x), max(my, y), max(mz, z)}
+    end
+  end
+
+  defp get_connected_cubes(pos, cubes) do
+    get_connected_cubes(pos, cubes, MapSet.new())
+  end
+
+  defp get_connected_cubes(pos, cubes, visited) do
+    for delta <- [{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}],
+        reduce: visited do
+      visited ->
+        neighboor = Day18.new_position(pos, delta)
+
+        if MapSet.member?(cubes, neighboor) && !MapSet.member?(visited, neighboor) do
+          get_connected_cubes(neighboor, cubes, MapSet.put(visited, neighboor))
+        else
+          visited
+        end
+    end
+  end
+end
+
+positions =
+  input
+  |> Kino.Input.read()
+  |> String.split("\n", trim: true)
+  |> Enum.map(fn coord ->
+    coord
+    |> String.split(",", trim: true)
+    |> Enum.map(&String.to_integer/1)
+    |> List.to_tuple()
+  end)
+
+cubes = MapSet.new(positions)
+
+total =
+  cubes
+  |> Enum.reduce(0, fn cube, acc ->
+    acc + Day18.count_sides(cube, cubes)
+  end)
+
+# Invert cube
+inverted = CubeMath.invert(cubes)
+
+# Get outer area
+outer_area = CubeMath.get_outer_area(inverted)
+# find difference
+
+difference = MapSet.difference(inverted, outer_area)
+
+cubes = MapSet.new(difference)
+
+interior =
+  cubes
+  |> Enum.reduce(0, fn cube, acc ->
+    acc + Day18.count_sides(cube, cubes)
+  end)
+
+total - interior
+```
