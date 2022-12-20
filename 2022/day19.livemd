@@ -1,0 +1,252 @@
+# Day 19
+
+```elixir
+Mix.install([{:kino, "~>0.8.0"}])
+```
+
+## Setup
+
+```elixir
+input = Kino.Input.textarea("input file")
+```
+
+## Part 1
+
+```elixir
+defmodule Day19 do
+  def build_robots(state) do
+    state
+    |> Enum.map(fn {id, blueprint_strategy} ->
+      materials = %{
+        ore: blueprint_strategy[:ore],
+        clay: blueprint_strategy[:clay],
+        obsidian: blueprint_strategy[:obsidian],
+        geode: blueprint_strategy[:geode]
+      }
+
+      costs = %{
+        ore_robot: %{cost: blueprint_strategy[:ore_robot][:cost]},
+        clay_robot: %{cost: blueprint_strategy[:clay_robot][:cost]},
+        obsidian_robot: %{
+          ore_cost: blueprint_strategy[:obsidian_robot][:ore_cost],
+          clay_cost: blueprint_strategy[:obsidian_robot][:clay_cost]
+        },
+        geode_robot: %{
+          ore_cost: blueprint_strategy[:geode_robot][:ore_cost],
+          obsidian_cost: blueprint_strategy[:geode_robot][:obsidian_cost]
+        }
+      }
+
+      {new_robots, remaining_materials} =
+        {[], materials}
+        |> build_geode_robots(
+          {costs[:geode_robot][:ore_cost], costs[:geode_robot][:obsidian_cost]}
+        )
+        |> build_obsidian_robots(
+          {costs[:obsidian_robot][:ore_cost], costs[:obsidian_robot][:clay_cost]}
+        )
+        |> build_clay_robots(costs[:clay_robot][:cost])
+        |> build_ore_robots(costs[:ore_robot][:cost])
+
+      {id, new_robots, remaining_materials}
+    end)
+  end
+
+  def pick_resources(state) do
+    state
+    |> Enum.map(fn {id, blueprint_strategy} ->
+      ore_robots = blueprint_strategy[:ore_robot][:amount]
+      clay_robots = blueprint_strategy[:clay_robot][:amount]
+      obsidian_robots = blueprint_strategy[:obsidian_robot][:amount]
+      geode_robots = blueprint_strategy[:geode_robot][:amount]
+
+      {id,
+       %{
+         ore: ore_robots,
+         clay: clay_robots,
+         obsidian: obsidian_robots || 0,
+         geode: geode_robots || 0
+       }}
+    end)
+  end
+
+  def merge(state, new_robots, new_resources) do
+    state
+    |> Enum.map(fn {blueprint_id, blueprint} ->
+      {_, robots_to_add_for_blueprint, remaining_materials_for_blueprint} =
+        new_robots |> Enum.find(fn {id, _, _} -> id == blueprint_id end)
+
+      new_ore_robots =
+        robots_to_add_for_blueprint |> Enum.count(fn robot -> robot == {:ore_robot} end)
+
+      new_clay_robots =
+        robots_to_add_for_blueprint |> Enum.count(fn robot -> robot == {:clay_robot} end)
+
+      new_obsidian_robots =
+        robots_to_add_for_blueprint |> Enum.count(fn robot -> robot == {:obsidian_robot} end)
+
+      new_geode_robots =
+        robots_to_add_for_blueprint |> Enum.count(fn robot -> robot == {:geode_robot} end)
+
+      {_, materials_to_add_for_blueprint} =
+        new_resources |> Enum.find(fn {id, _} -> id == blueprint_id end)
+
+      {
+        blueprint_id,
+        %{
+          blueprint
+          | clay:
+              remaining_materials_for_blueprint[:clay] + materials_to_add_for_blueprint[:clay],
+            ore: remaining_materials_for_blueprint[:ore] + materials_to_add_for_blueprint[:ore],
+            obsidian:
+              remaining_materials_for_blueprint[:obsidian] +
+                materials_to_add_for_blueprint[:obsidian],
+            geode:
+              remaining_materials_for_blueprint[:geode] + materials_to_add_for_blueprint[:geode],
+            clay_robot: %{
+              blueprint[:clay_robot]
+              | amount: blueprint[:clay_robot][:amount] + new_clay_robots
+            },
+            ore_robot: %{
+              blueprint[:ore_robot]
+              | amount: blueprint[:ore_robot][:amount] + new_ore_robots
+            },
+            obsidian_robot: %{
+              blueprint[:obsidian_robot]
+              | amount: blueprint[:obsidian_robot][:amount] + new_obsidian_robots
+            },
+            geode_robot: %{
+              blueprint[:geode_robot]
+              | amount: blueprint[:geode_robot][:amount] + new_geode_robots
+            }
+        }
+      }
+    end)
+  end
+
+  # Private methods
+  defp build_geode_robots({new_robots, materials}, {ore_cost, obsidian_cost}) do
+    if materials[:ore] >= ore_cost and materials[:obsidian] >= obsidian_cost do
+      # reduce materials and add new robot
+      {new_robots ++ [{:geode_robot}],
+       %{
+         materials
+         | ore: materials[:ore] - ore_cost,
+           obsidian: materials[:obsidian] - obsidian_cost
+       }}
+    else
+      # return same materials and no new robot
+      {new_robots, materials}
+    end
+  end
+
+  defp build_obsidian_robots({new_robots, materials}, {ore_cost, clay_cost}) do
+    if materials[:ore] >= ore_cost and materials[:clay] >= clay_cost do
+      # reduce materials and add new robot
+      {new_robots ++ [{:obsidian_robot}],
+       %{materials | ore: materials[:ore] - ore_cost, clay: materials[:clay] - clay_cost}}
+    else
+      # return same materials and no new robot
+      {new_robots, materials}
+    end
+  end
+
+  defp build_clay_robots({new_robots, materials}, ore_cost) do
+    if materials[:ore] >= ore_cost do
+      {new_robots ++ [{:clay_robot}], %{materials | ore: materials[:ore] - ore_cost}}
+    else
+      # return same materials and no new robot
+      {new_robots, materials}
+    end
+  end
+
+  defp build_ore_robots({new_robots, materials}, ore_cost) do
+    if materials[:ore] >= ore_cost do
+      {new_robots ++ [{:ore_robot}], %{materials | ore: materials[:ore] - ore_cost}}
+    else
+      # return same materials and no new robot
+      {new_robots, materials}
+    end
+  end
+end
+
+init_state =
+  input
+  |> Kino.Input.read()
+  |> String.split("\n", trim: true)
+  |> Enum.map(fn blueprint_str ->
+    [
+      [
+        _,
+        blueprint_id,
+        ore_robot_cost,
+        clay_robot_cost,
+        obsidian_robot_ore_cost,
+        obsidian_robot_clay_cost,
+        geode_robot_ore_cost,
+        geode_robot_obsidian_cost
+      ]
+    ] =
+      Regex.scan(
+        ~r/Blueprint (?<id>\d+): Each ore robot costs (?<ore_robot_cost>\d+) ore. Each clay robot costs (?<clay_robot_cost>\d+).+ Each obsidian robot costs (?<obsidian_ore_cost>\d+) ore and (?<obsidian_clay_cost>\d+) clay. Each geode robot costs (?<geode_ore_cost>\d+) ore and (?<geode_obsidian_cost>\d+) obsidian./,
+        blueprint_str
+      )
+
+    [
+      String.to_integer(blueprint_id),
+      %{
+        id: String.to_integer(blueprint_id),
+        ore_robot: %{cost: String.to_integer(ore_robot_cost), amount: 1},
+        clay_robot: %{cost: String.to_integer(clay_robot_cost), amount: 0},
+        obsidian_robot: %{
+          ore_cost: String.to_integer(obsidian_robot_ore_cost),
+          clay_cost: String.to_integer(obsidian_robot_clay_cost),
+          amount: 0
+        },
+        geode_robot: %{
+          ore_cost: String.to_integer(geode_robot_ore_cost),
+          obsidian_cost: String.to_integer(geode_robot_obsidian_cost),
+          amount: 0
+        },
+        ore: 0,
+        clay: 0,
+        obsidian: 0,
+        geode: 0
+      }
+    ]
+    |> List.to_tuple()
+  end)
+
+final_state =
+  1..24
+  |> Enum.reduce(init_state, fn minute, acc ->
+    IO.inspect("===== Minute " <> Integer.to_string(minute) <> "=========")
+    # Build
+    new_robots = Day19.build_robots(acc)
+    # Collect
+    new_resources = Day19.pick_resources(acc)
+
+    # IO.inspect(new_robots)
+    # IO.inspect(new_resources)
+
+    res_res = Day19.merge(acc, new_robots, new_resources)
+
+    [{_, res}] = res_res
+    IO.inspect("geode: " <> Integer.to_string(res[:geode]))
+    IO.inspect("obsidian: " <> Integer.to_string(res[:obsidian]))
+    IO.inspect("clay: " <> Integer.to_string(res[:clay]))
+    IO.inspect("ore: " <> Integer.to_string(res[:ore]))
+    IO.inspect("..")
+    IO.inspect("geode robots: " <> Integer.to_string(res[:geode_robot][:amount]))
+    IO.inspect("obsidian robots: " <> Integer.to_string(res[:obsidian_robot][:amount]))
+    IO.inspect("clay robots: " <> Integer.to_string(res[:clay_robot][:amount]))
+    IO.inspect("ore robots: " <> Integer.to_string(res[:ore_robot][:amount]))
+    res_res
+  end)
+
+# final_state
+# |> Enum.map(fn {blueprint_id, blueprint} -> 
+#   blueprint_id * blueprint[:geode]
+# end)
+# |> Enum.sum()
+```
