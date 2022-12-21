@@ -1,0 +1,172 @@
+# AoC 2022 - Day 21
+
+```elixir
+Mix.install([:kino])
+```
+
+## Setup
+
+```elixir
+input = Kino.Input.textarea("input file")
+```
+
+## Common
+
+```elixir
+defmodule Day21 do
+  @me :humn
+
+  def get_answer_part_1(map, key) do
+    do_get_result(map, map[key])
+  end
+
+  # humn is ME!
+  def get_answer_part_2(map, key) do
+    {first, _, second} = map[key]
+
+    left = do_get_answer_part_2(map, first, map[first], "??")
+    right = do_get_answer_part_2(map, second, map[second], "??")
+    IO.inspect("--------------------")
+    IO.inspect(left)
+    IO.inspect("should be equals to")
+    IO.inspect(Code.eval_string(right))
+    IO.inspect("----------------")
+
+    nil
+  end
+
+  def process_equation(equation) do
+    try do
+      String.to_integer(equation)
+    rescue
+      _ -> process_real_equation(equation)
+    end
+  end
+
+  # Private methods
+  defp get_string(val) when is_integer(val) do
+    Integer.to_string(val)
+  end
+
+  defp get_string(val) when is_float(val) do
+    Float.to_string(val)
+  end
+
+  defp get_string(val), do: val
+
+  defp do_get_answer_part_2(_map, key, _val, _val_for_humn) when key == @me, do: "<VAR>"
+  defp do_get_answer_part_2(_map, _key, val, _val_for_humn) when is_number(val), do: val
+
+  defp do_get_answer_part_2(map, _key, {left, :+, right}, val_for_humn) do
+    one = do_get_answer_part_2(map, left, map[left], val_for_humn)
+    two = do_get_answer_part_2(map, right, map[right], val_for_humn)
+
+    if is_number(one) and is_number(two) do
+      one + two
+    else
+      get_string(one) <> "+" <> get_string(two)
+    end
+  end
+
+  defp do_get_answer_part_2(map, _key, {left, :-, right}, val_for_humn) do
+    one = do_get_answer_part_2(map, left, map[left], val_for_humn)
+    two = do_get_answer_part_2(map, right, map[right], val_for_humn)
+
+    if is_number(one) and is_number(two) do
+      one - two
+    else
+      get_string(one) <> "-" <> get_string(two)
+    end
+  end
+
+  defp do_get_answer_part_2(map, _key, {left, :*, right}, val_for_humn) do
+    one = do_get_answer_part_2(map, left, map[left], val_for_humn)
+    two = do_get_answer_part_2(map, right, map[right], val_for_humn)
+
+    if is_number(one) and is_number(two) do
+      one * two
+    else
+      "(" <> get_string(one) <> "*" <> get_string(two) <> ")"
+    end
+  end
+
+  defp do_get_answer_part_2(map, _key, {left, :/, right}, val_for_humn) do
+    one = do_get_answer_part_2(map, left, map[left], val_for_humn)
+    two = do_get_answer_part_2(map, right, map[right], val_for_humn)
+
+    if is_number(one) and is_number(two) do
+      one / two
+    else
+      "(" <> get_string(one) <> "/" <> get_string(two) <> ")"
+    end
+  end
+
+  defp do_get_result(_map, val) when is_number(val), do: val
+
+  defp do_get_result(map, {left, :+, right}) do
+    do_get_result(map, map[left]) + do_get_result(map, map[right])
+  end
+
+  defp do_get_result(map, {left, :-, right}) do
+    do_get_result(map, map[left]) - do_get_result(map, map[right])
+  end
+
+  defp do_get_result(map, {left, :*, right}) do
+    do_get_result(map, map[left]) * do_get_result(map, map[right])
+  end
+
+  defp do_get_result(map, {left, :/, right}) do
+    do_get_result(map, map[left]) / do_get_result(map, map[right])
+  end
+
+  defp process_real_equation(equation) do
+    regex = ~r/(?<first>.+) (?<math_op>.) (?<second>.+)/
+    [[_, first, math_op, second]] = Regex.scan(regex, equation)
+
+    {String.to_atom(first), String.to_atom(math_op), String.to_atom(second)}
+  end
+end
+```
+
+## Part 1
+
+```elixir
+monkeys =
+  input
+  |> Kino.Input.read()
+  |> String.split("\n", trim: true)
+  |> Enum.map(fn line ->
+    line
+    |> String.split(": ", trim: true)
+    |> List.to_tuple()
+  end)
+  |> Enum.map(fn {id, val} ->
+    {String.to_atom(id), Day21.process_equation(val)}
+  end)
+  |> Map.new()
+
+monkeys
+|> Day21.get_answer_part_1(:root)
+|> floor()
+```
+
+## Part 2
+
+```elixir
+monkeys =
+  input
+  |> Kino.Input.read()
+  |> String.split("\n", trim: true)
+  |> Enum.map(fn line ->
+    line
+    |> String.split(": ", trim: true)
+    |> List.to_tuple()
+  end)
+  |> Enum.map(fn {id, val} ->
+    {String.to_atom(id), Day21.process_equation(val)}
+  end)
+  |> Map.new()
+
+monkeys
+|> Day21.get_answer_part_2(:root)
+```
