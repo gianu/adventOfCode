@@ -1,0 +1,157 @@
+# AoC 2022 - Day 23
+
+```elixir
+Mix.install([:kino])
+```
+
+## Setup
+
+```elixir
+input = Kino.Input.textarea("input file")
+```
+
+## Common
+
+```elixir
+defmodule Day23 do
+  def part1(input) do
+    {points, _} =
+      input
+      |> Enum.reduce({MapSet.new(), 1}, fn line, {acc, row} ->
+        acc =
+          String.to_charlist(line)
+          |> Enum.with_index()
+          |> Enum.filter(fn {c, _i} -> c == ?# end)
+          |> Enum.map(fn {_, col} -> {row, col} end)
+          |> Enum.into(acc)
+
+        {acc, row + 1}
+      end)
+
+    pref_cycle = Stream.cycle(get_preferred_cycle())
+
+    points =
+      Enum.reduce(1..10, points, fn round, points ->
+        run_round(points, round_prefs(round, pref_cycle))
+      end)
+
+    bounding_rectangle_size(points) - Enum.count(points)
+  end
+
+  def part2(input) do
+    {points, _} =
+      input
+      |> Enum.reduce({MapSet.new(), 1}, fn line, {acc, row} ->
+        acc =
+          String.to_charlist(line)
+          |> Enum.with_index()
+          |> Enum.filter(fn {c, _i} -> c == ?# end)
+          |> Enum.map(fn {_, col} -> {row, col} end)
+          |> Enum.into(acc)
+
+        {acc, row + 1}
+      end)
+
+    pref_cycle = Stream.cycle(get_preferred_cycle())
+
+    Enum.reduce_while(Stream.iterate(1, &(&1 + 1)), points, fn round, points ->
+      next = run_round(points, round_prefs(round, pref_cycle))
+      if MapSet.equal?(points, next), do: {:halt, round}, else: {:cont, next}
+    end)
+  end
+
+  # Private methods
+  defp get_preferred_cycle() do
+    north = {-1, 0}
+    south = {1, 0}
+    east = {0, 1}
+    west = {0, -1}
+    north_east = {-1, 1}
+    north_west = {-1, -1}
+    south_east = {1, 1}
+    south_west = {1, -1}
+
+    northern = {north, [north, north_east, north_west]}
+    southern = {south, [south, south_east, south_west]}
+    western = {west, [west, north_west, south_west]}
+    eastern = {east, [east, north_east, south_east]}
+
+    [northern, southern, western, eastern]
+  end
+
+  defp get_all_direction() do
+    north = {-1, 0}
+    south = {1, 0}
+    east = {0, 1}
+    west = {0, -1}
+    north_east = {-1, 1}
+    north_west = {-1, -1}
+    south_east = {1, 1}
+    south_west = {1, -1}
+
+    [north_west, north, north_east, east, south_east, south, south_west, west]
+  end
+
+  defp run_round(points, prefs) do
+    Enum.reduce(points, %{}, fn point, acc ->
+      dir = pick_move(point, points, prefs)
+      Map.update(acc, move(point, dir), [point], fn rest -> [point | rest] end)
+    end)
+    |> Enum.map(fn
+      {dest, [_cur]} -> [dest]
+      {_, several} -> several
+    end)
+    |> List.flatten()
+    |> Enum.into(MapSet.new())
+  end
+
+  defp round_prefs(round, pref_cycle),
+    do: Stream.drop(pref_cycle, rem(round - 1, 4)) |> Stream.take(4) |> Enum.into([])
+
+  defp bounding_rectangle(points) do
+    {top, bottom} = points |> Enum.map(&elem(&1, 0)) |> Enum.min_max()
+    {left, right} = points |> Enum.map(&elem(&1, 1)) |> Enum.min_max()
+    {top, bottom, left, right}
+  end
+
+  defp bounding_rectangle_size(points) do
+    {top, bottom, left, right} = bounding_rectangle(points)
+    (bottom - top + 1) * (right - left + 1)
+  end
+
+  defp pick_move(point, points, prefs) do
+    if Enum.all?(get_all_direction(), fn dir -> not MapSet.member?(points, move(point, dir)) end) do
+      {0, 0}
+    else
+      {dir, _} =
+        Enum.find(prefs, {{0, 0}, [{0, 0}]}, fn {_, dirs} ->
+          dirs
+          |> Enum.map(&move(point, &1))
+          |> Enum.all?(fn el -> not MapSet.member?(points, el) end)
+        end)
+
+      dir
+    end
+  end
+
+  defp move({row, col}, {drow, dcol}), do: {row + drow, col + dcol}
+end
+```
+
+## Part 1
+
+```elixir
+input
+|> Kino.Input.read()
+|> String.split("\n", trim: true)
+|> Day23.part1()
+```
+
+## Part 2
+
+```elixir
+input
+|> Kino.Input.read()
+|> String.split("\n", trim: true)
+|> Day23.part2()
+```
