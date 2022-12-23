@@ -1,0 +1,420 @@
+# AoC 2022 - Day 22
+
+```elixir
+Mix.install([:kino])
+```
+
+## Setup
+
+```elixir
+input = Kino.Input.textarea("file input")
+```
+
+## Part 1
+
+```elixir
+defmodule Day22 do
+  def move(map, {facing, position}, action) when is_number(action) do
+    new_position =
+      1..action
+      |> Enum.reduce_while(position, fn _, acc ->
+        new_position = get_new_position(acc, facing)
+
+        if is_valid_position(map, new_position) do
+          # check if it is a wall
+          element = get_map_element(map, new_position)
+
+          cond do
+            element == "." ->
+              {:cont, new_position}
+
+            element == "#" ->
+              {:halt, acc}
+
+            element == " " ->
+              raise "We're in an invalid position! WHY??"
+
+            element == nil ->
+              raise "Got a nil! WHY?"
+          end
+        else
+          teleported_position = get_teleported_position(map, acc, facing)
+          # we need to move to the other way. But first we need to check if there is a
+          # wall on the other side
+          element = get_map_element(map, teleported_position)
+
+          cond do
+            element == "." ->
+              {:cont, teleported_position}
+
+            element == "#" ->
+              {:halt, acc}
+
+            element == " " ->
+              raise "We're in an invalid teleported position! WTF???"
+
+            true ->
+              raise "Error 2!"
+          end
+        end
+      end)
+
+    {facing, new_position}
+  end
+
+  def move(_map, {facing, position}, action) do
+    new_facing = change_facing(facing, action)
+
+    {new_facing, position}
+  end
+
+  def get_facing_value(:right), do: 0
+  def get_facing_value(:down), do: 1
+  def get_facing_value(:left), do: 2
+  def get_facing_value(:up), do: 3
+
+  # Private methods
+  defp get_teleported_position(map, {_x, y}, :right) do
+    # get the new position on the left side of this row
+    # this is, the first element on the left side that is not a space.
+    row = Enum.at(map, y)
+    new_x = Enum.find_index(row, fn el -> el != " " end)
+    {new_x, y}
+  end
+
+  defp get_teleported_position(map, {_x, y}, :left) do
+    # get the new position on the right side of this row
+    # this is, the first element on the right side that is not a space.
+    row = Enum.at(map, y)
+    new_x = length(row) - 1
+    {new_x, y}
+  end
+
+  defp get_teleported_position(map, {x, _y}, :up) do
+    # get the new position on the bottom side of this column
+    # this is, the first element on the bottom side of this column that is not a space.
+    new_y =
+      (length(map) - 1)..0
+      |> Enum.reduce_while(0, fn val, _acc ->
+        if is_valid_position(map, {x, val}) do
+          element = get_map_element(map, {x, val})
+
+          if element != " " do
+            {:halt, val}
+          else
+            {:cont, val}
+          end
+        else
+          {:cont, val}
+        end
+      end)
+
+    {x, new_y}
+  end
+
+  defp get_teleported_position(map, {x, _y}, :down) do
+    # get the new position on the upper side of this column
+    # this is, the first element on the upper side of this column that is not a space.
+    new_y =
+      0..(length(map) - 1)
+      |> Enum.reduce_while(0, fn val, _acc ->
+        if is_valid_position(map, {x, val}) do
+          element = get_map_element(map, {x, val})
+
+          if element != " " do
+            {:halt, val}
+          else
+            {:cont, val}
+          end
+        else
+          {:cont, val}
+        end
+      end)
+
+    {x, new_y}
+  end
+
+  defp is_valid_position(_map, {x, y}) when x < 0 or y < 0, do: false
+  defp is_valid_position(map, {_x, y}) when length(map) < y + 1, do: false
+
+  defp is_valid_position(map, {x, y}) do
+    row = Enum.at(map, y)
+
+    if length(row) > x do
+      el = get_map_element(map, {x, y})
+
+      cond do
+        el == " " ->
+          false
+
+        el == nil ->
+          false
+
+        true ->
+          true
+      end
+    else
+      false
+    end
+  end
+
+  def get_map_element(map, {x, y}) do
+    Enum.at(Enum.at(map, y), x)
+  end
+
+  defp get_new_position({x, y}, :down), do: {x, y + 1}
+  defp get_new_position({x, y}, :up), do: {x, y - 1}
+  defp get_new_position({x, y}, :right), do: {x + 1, y}
+  defp get_new_position({x, y}, :left), do: {x - 1, y}
+
+  defp change_facing(:right, "R"), do: :down
+  defp change_facing(:down, "R"), do: :left
+  defp change_facing(:left, "R"), do: :up
+  defp change_facing(:up, "R"), do: :right
+  defp change_facing(:right, "L"), do: :up
+  defp change_facing(:up, "L"), do: :left
+  defp change_facing(:left, "L"), do: :down
+  defp change_facing(:down, "L"), do: :right
+end
+
+[map, instructions] =
+  input
+  |> Kino.Input.read()
+  |> String.split("\n\n")
+
+map =
+  map
+  |> String.split("\n")
+  |> Enum.map(&String.split(&1, "", trim: true))
+
+regex = ~r/(?<digit>\d+)(?<letter>[R|L]{1})?+/
+
+steps =
+  Regex.scan(regex, instructions)
+  |> Enum.flat_map(fn step ->
+    case step do
+      [_, units, rotation] ->
+        [String.to_integer(units), rotation]
+
+      [_, units] ->
+        [String.to_integer(units)]
+    end
+  end)
+
+starting_x = Enum.find_index(Enum.at(map, 0), fn el -> el == "." end)
+initial_position = {starting_x, 0}
+initial_facing = :right
+
+{facing, {col, row}} =
+  steps
+  |> Enum.reduce({initial_facing, initial_position}, fn step, acc ->
+    Day22.move(map, acc, step)
+  end)
+
+facing_val = Day22.get_facing_value(facing)
+adj_row = row + 1
+adj_col = col + 1
+
+# The final password is the sum of 1000 times the row, 4 times the column, and the facing.
+# facing is: 0 for right (>), 1 for down (v), 2 for left (<), and 3 for up (^)
+
+1000 * adj_row + 4 * adj_col + facing_val
+```
+
+## Part 2
+
+```elixir
+defmodule Day22_part2 do
+  def move(map, {facing, position}, action) when is_number(action) do
+    {new_position, new_facing} =
+      1..action
+      |> Enum.reduce_while({position, facing}, fn _, acc ->
+        {curr_position, curr_facing} = acc
+        {new_position, new_facing} = get_new_position(curr_position, curr_facing)
+        new_facing = new_facing || curr_facing
+
+        element = get_map_element(map, new_position)
+
+        cond do
+          element == "." ->
+            {:cont, {new_position, new_facing}}
+
+          element == "#" ->
+            {:halt, acc}
+        end
+      end)
+
+    {new_facing, new_position}
+  end
+
+  def move(_map, {facing, position}, action) do
+    new_facing = change_facing(facing, action)
+
+    {new_facing, position}
+  end
+
+  def get_facing_value(:right), do: 0
+  def get_facing_value(:down), do: 1
+  def get_facing_value(:left), do: 2
+  def get_facing_value(:up), do: 3
+
+  # Private methods
+  def get_map_element(map, {x, y}) do
+    Enum.at(Enum.at(map, y), x)
+  end
+
+  defp get_new_position({x, y}, :down) do
+    {facing, col, row} = cube_new_pos(y + 1, x)
+
+    {{row, col}, facing}
+  end
+
+  defp get_new_position({x, y}, :up) do
+    {facing, col, row} = cube_new_pos(y - 1, x)
+
+    {{row, col}, facing}
+  end
+
+  defp get_new_position({x, y}, :right) do
+    {facing, col, row} = cube_new_pos(y, x + 1)
+
+    {{row, col}, facing}
+  end
+
+  defp get_new_position({x, y}, :left) do
+    {facing, col, row} = cube_new_pos(y, x - 1)
+
+    {{row, col}, facing}
+  end
+
+  ##### Left sides
+  defp cube_new_pos(row, 49) when row < 50 do
+    # left of 1 --> left of 5
+    {:right, 149 - row, 0}
+  end
+
+  defp cube_new_pos(row, 49) when row < 100 do
+    # left of 3 --> top of 5
+    {:down, 100, row - 50}
+  end
+
+  defp cube_new_pos(row, -1) when row < 150 do
+    # left of 5 --> left of 1
+    {:right, 49 - (row - 100), 50}
+  end
+
+  defp cube_new_pos(row, -1) do
+    # left of 6 --> top of 1
+    {:down, 0, 50 + (row - 150)}
+  end
+
+  #### Top sides
+  defp cube_new_pos(-1, col) when col < 100 do
+    # top of 1 --> left of 6
+    {:right, col - 50 + 150, 0}
+  end
+
+  defp cube_new_pos(-1, col) do
+    # top of 2 --> bottom of 6
+    {:up, 199, col - 100}
+  end
+
+  defp cube_new_pos(99, col) when col < 50 do
+    # top of 5 --> left of 3
+    {:right, 50 + col, 50}
+  end
+
+  #### Right sides
+  defp cube_new_pos(row, 150) do
+    # right of 2 --> right of 4 (UD)
+    {:left, 149 - row, 99}
+  end
+
+  defp cube_new_pos(row, 50) when row >= 150 do
+    # right of 6 --> bottom of 4
+    {:up, 149, 50 + (row - 150)}
+  end
+
+  defp cube_new_pos(row, 100) when row >= 100 do
+    # right of 4 --> right of 2
+    {:left, 49 - (row - 100), 149}
+  end
+
+  defp cube_new_pos(row, 100) when row >= 50 do
+    # right of 3 --> bottom of 2
+    {:up, 49, 100 + (row - 50)}
+  end
+
+  #### Bottom sides
+  defp cube_new_pos(200, col) do
+    # bottom of 6 --> top of 1
+    {:down, 0, 100 + col}
+  end
+
+  defp cube_new_pos(150, col) when col >= 50 do
+    # bottom of 4 --> right of 6
+    {:left, 150 + (col - 50), 49}
+  end
+
+  defp cube_new_pos(50, col) when col >= 100 do
+    # bottom of 2 --> right of 3
+    {:left, col - 100 + 50, 99}
+  end
+
+  defp cube_new_pos(r, c) do
+    {nil, r, c}
+  end
+
+  defp change_facing(:right, "R"), do: :down
+  defp change_facing(:down, "R"), do: :left
+  defp change_facing(:left, "R"), do: :up
+  defp change_facing(:up, "R"), do: :right
+  defp change_facing(:right, "L"), do: :up
+  defp change_facing(:up, "L"), do: :left
+  defp change_facing(:left, "L"), do: :down
+  defp change_facing(:down, "L"), do: :right
+end
+
+[map, instructions] =
+  input
+  |> Kino.Input.read()
+  |> String.split("\n\n")
+
+map =
+  map
+  |> String.split("\n")
+  |> Enum.map(&String.split(&1, "", trim: true))
+
+regex = ~r/(?<digit>\d+)(?<letter>[R|L]{1})?+/
+
+steps =
+  Regex.scan(regex, instructions)
+  |> Enum.flat_map(fn step ->
+    case step do
+      [_, units, rotation] ->
+        [String.to_integer(units), rotation]
+
+      [_, units] ->
+        [String.to_integer(units)]
+    end
+  end)
+
+starting_x = Enum.find_index(Enum.at(map, 0), fn el -> el == "." end)
+initial_position = {starting_x, 0}
+initial_facing = :right
+
+{facing, {col, row}} =
+  steps
+  |> Enum.reduce({initial_facing, initial_position}, fn step, acc ->
+    Day22_part2.move(map, acc, step)
+  end)
+
+facing_val = Day22.get_facing_value(facing)
+adj_row = row + 1
+adj_col = col + 1
+
+# The final password is the sum of 1000 times the row, 4 times the column, and the facing.
+# facing is: 0 for right (>), 1 for down (v), 2 for left (<), and 3 for up (^)
+
+1000 * adj_row + 4 * adj_col + facing_val
+```
