@@ -1,0 +1,73 @@
+# AoC 2022 - Day 25 🎄
+
+```elixir
+Mix.install([:kino])
+```
+
+## Setup
+
+```elixir
+input = Kino.Input.textarea("file input")
+```
+
+## Part 1
+
+```elixir
+defmodule Day25 do
+  @int_carry_digit %{4 => {1, ?-}, 3 => {1, ?=}, 2 => {0, ?2}, 1 => {0, ?1}, 0 => {0, ?0}}
+
+  def parse_number(num_str) do
+    num_str
+    |> String.split("", trim: true)
+    |> Enum.reverse()
+    |> get_snafu_value()
+  end
+
+  def to_snafu(x) when x >= 0 and x <= 2, do: [elem(@int_carry_digit[x], 1)]
+
+  def to_snafu(sum) do
+    {carry, digit} = @int_carry_digit[rem(sum, 5)]
+    to_snafu(div(sum, 5) + carry) ++ [digit]
+  end
+
+  # Private method
+  def get_snafu_value(snfu_inverted_list) do
+    do_get_snafu_value(snfu_inverted_list, 0, 0)
+  end
+
+  def do_get_snafu_value([], _power_of, total) do
+    # IO.inspect("reached end: " <> Integer.to_string(total))
+    total
+  end
+
+  def do_get_snafu_value(["0" | rest], power_of, total) do
+    # IO.inspect("got 0 in " <> Integer.to_string(power_of) <> " result: " <> Integer.to_string(0))
+    do_get_snafu_value(rest, power_of + 1, total)
+  end
+
+  def do_get_snafu_value(["1" | rest], power_of, total) do
+    # IO.inspect("got 1 in " <> Integer.to_string(power_of) <> " result: " <> Integer.to_string(5 ** power_of))
+    do_get_snafu_value(rest, power_of + 1, total + 5 ** power_of)
+  end
+
+  def do_get_snafu_value(["2" | rest], power_of, total) do
+    # IO.inspect("got 2 in " <> Integer.to_string(power_of) <> " result: " <> Integer.to_string(2 * (5 ** power_of)))
+    do_get_snafu_value(rest, power_of + 1, total + 2 * 5 ** power_of)
+  end
+
+  def do_get_snafu_value(["-" | rest], power_of, total) do
+    do_get_snafu_value(rest, power_of + 1, total + 5 ** power_of * -1)
+  end
+
+  def do_get_snafu_value(["=" | rest], power_of, total) do
+    do_get_snafu_value(rest, power_of + 1, total + 5 ** power_of * -2)
+  end
+end
+
+input
+|> Kino.Input.read()
+|> String.split("\n", trim: true)
+|> Enum.map(&Day25.parse_number/1)
+|> Enum.sum()
+|> Day25.to_snafu()
+```
