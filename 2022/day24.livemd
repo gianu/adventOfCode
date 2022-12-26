@@ -1,0 +1,147 @@
+# AoC 2022 - Day 24
+
+```elixir
+Mix.install([:kino])
+```
+
+## Setup
+
+```elixir
+input = Kino.Input.textarea("file input")
+```
+
+## Common
+
+```elixir
+defmodule Day24 do
+  def remove_first_and_last(l) do
+    tl(l) |> Enum.reverse() |> tl() |> Enum.reverse()
+  end
+
+  def parse_line({line, r}) do
+    line
+    |> String.to_charlist()
+    |> remove_first_and_last()
+    |> Enum.with_index()
+    |> Enum.map(fn {value, c} -> {{r, c}, value} end)
+  end
+
+  def get_internal_maze_dimentions(data) do
+    lines = String.split(data, "\n")
+    {length(lines) - 2, String.length(hd(lines)) - 2}
+  end
+
+  def shortest_path(map, start_rc, end_rc, start_time) do
+    # We need 1 minute to go from the initial starting point to the maze.
+    shortest_path(map, start_rc, end_rc, start_time + 1, MapSet.new(), :queue.new())
+  end
+
+  def shortest_path(map, start_rc, end_rc, start_time, visited, {[], []}) do
+    if is_free(map, start_rc, start_time) do
+      q = :queue.in({start_rc, start_time}, {[], []})
+      shortest_path(map, start_rc, end_rc, start_time + 1, visited, q)
+    else
+      shortest_path(map, start_rc, end_rc, start_time + 1, visited, {[], []})
+    end
+  end
+
+  def shortest_path(map, start_rc, end_rc, start_time, visited, q) do
+    {{:value, {rc, t}}, q} = :queue.out(q)
+
+    if rc == end_rc do
+      t + 1
+    else
+      if {rc, t} not in visited do
+        visited = MapSet.put(visited, {rc, t})
+        q = add_next_steps(map, rc, t, q)
+        shortest_path(map, start_rc, end_rc, start_time, visited, q)
+      else
+        shortest_path(map, start_rc, end_rc, start_time, visited, q)
+      end
+    end
+  end
+
+  # Private methods
+  defp add_next_steps(map, {row, col}, t, q) do
+    [{0, 1}, {0, -1}, {1, 0}, {-1, 0}, {0, 0}]
+    |> Enum.map(fn {dr, dc} -> {row + dr, col + dc} end)
+    |> Enum.filter(fn {row, col} ->
+      row >= 0 and col >= 0 and row < map.rows and col < map.cols
+    end)
+    |> Enum.filter(fn rc -> is_free(map, rc, t + 1) end)
+    |> Enum.reduce(q, fn rc, q -> :queue.in({rc, t + 1}, q) end)
+  end
+
+  defp is_free(map, {row, col}, start_time) do
+    right_blizzard_c = Integer.mod(col - start_time, map.cols)
+    left_blizzard_c = Integer.mod(col + start_time, map.cols)
+    down_blizzard_r = Integer.mod(row - start_time, map.rows)
+    up_blizzard_r = Integer.mod(row + start_time, map.rows)
+
+    not (MapSet.member?(map.right, {row, right_blizzard_c}) or
+           MapSet.member?(map.left, {row, left_blizzard_c}) or
+           MapSet.member?(map.up, {up_blizzard_r, col}) or
+           MapSet.member?(map.down, {down_blizzard_r, col}))
+  end
+end
+```
+
+## Part 1
+
+```elixir
+data = input |> Kino.Input.read() |> String.trim()
+
+data_by_type =
+  data
+  |> String.split("\n")
+  |> Day24.remove_first_and_last()
+  |> Enum.with_index()
+  |> Enum.flat_map(&Day24.parse_line/1)
+  |> Enum.group_by(&elem(&1, 1), &elem(&1, 0))
+  |> Map.new(fn {k, v} -> {k, MapSet.new(v)} end)
+
+{r, c} = Day24.get_internal_maze_dimentions(data)
+
+map_info = %{
+  left: Map.get(data_by_type, ?<),
+  right: Map.get(data_by_type, ?>),
+  up: Map.get(data_by_type, ?^),
+  down: Map.get(data_by_type, ?v),
+  rows: r,
+  cols: c
+}
+
+Day24.shortest_path(map_info, {0, 0}, {map_info.rows - 1, map_info.cols - 1}, 0)
+```
+
+## Part 2
+
+```elixir
+data = input |> Kino.Input.read() |> String.trim()
+
+data_by_type =
+  data
+  |> String.split("\n")
+  |> Day24.remove_first_and_last()
+  |> Enum.with_index()
+  |> Enum.flat_map(&Day24.parse_line/1)
+  |> Enum.group_by(&elem(&1, 1), &elem(&1, 0))
+  |> Map.new(fn {k, v} -> {k, MapSet.new(v)} end)
+
+{r, c} = Day24.get_internal_maze_dimentions(data)
+
+map_info = %{
+  left: Map.get(data_by_type, ?<),
+  right: Map.get(data_by_type, ?>),
+  up: Map.get(data_by_type, ?^),
+  down: Map.get(data_by_type, ?v),
+  rows: r,
+  cols: c
+}
+
+start_rc = {0, 0}
+end_rc = {map_info.rows - 1, map_info.cols - 1}
+t1 = Day24.shortest_path(map_info, start_rc, end_rc, 0)
+t2 = Day24.shortest_path(map_info, end_rc, start_rc, t1)
+Day24.shortest_path(map_info, start_rc, end_rc, t2)
+```
