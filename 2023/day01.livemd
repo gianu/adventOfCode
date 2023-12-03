@@ -1,0 +1,84 @@
+# Day 1
+
+```elixir
+Mix.install([:kino])
+```
+
+## Section
+
+```elixir
+input = Kino.Input.textarea("enter your input")
+```
+
+## Part 1
+
+```elixir
+defmodule Aoc.Day1.Part1 do
+  def line_to_only_first_and_last_number(line) do
+    line
+    |> String.split("", trim: true)
+    |> Enum.filter(fn char ->
+      case Integer.parse(char) do
+        {_, ""} -> true
+        _ -> false
+      end
+    end)
+    |> then(fn val ->
+      [first | _] = val
+      last = List.last(val)
+      "#{first}#{last}"
+    end)
+  end
+end
+
+input
+|> Kino.Input.read()
+|> String.split("\n", trim: true)
+|> Enum.map(fn line ->
+  Aoc.Day1.Part1.line_to_only_first_and_last_number(line)
+end)
+|> Enum.map(fn val ->
+  {num, ""} = Integer.parse(val)
+  num
+end)
+|> Enum.sum()
+```
+
+## Part 2
+
+```elixir
+defmodule Aoc.Day1.Part2 do
+  def parse_line(line) do
+    replace_numbers(line)
+  end
+
+  # Apparently, if there is a number line oneight, we need to do 1 and 8.
+  # At least, that's what lead me to the right solution.
+  defp replace_numbers("one" <> rest), do: "1" <> replace_numbers("e" <> rest)
+  defp replace_numbers("two" <> rest), do: "2" <> replace_numbers("o" <> rest)
+  defp replace_numbers("three" <> rest), do: "3" <> replace_numbers("e" <> rest)
+  defp replace_numbers("four" <> rest), do: "4" <> replace_numbers("r" <> rest)
+  defp replace_numbers("five" <> rest), do: "5" <> replace_numbers("e" <> rest)
+  defp replace_numbers("six" <> rest), do: "6" <> replace_numbers("x" <> rest)
+  defp replace_numbers("seven" <> rest), do: "7" <> replace_numbers("n" <> rest)
+  defp replace_numbers("eight" <> rest), do: "8" <> replace_numbers("t" <> rest)
+  defp replace_numbers("nine" <> rest), do: "9" <> replace_numbers("e" <> rest)
+  defp replace_numbers(<<char, rest::binary>>), do: <<char>> <> replace_numbers(rest)
+  defp replace_numbers(""), do: ""
+end
+
+input
+|> Kino.Input.read()
+|> String.split("\n", trim: true)
+|> Enum.map(fn line ->
+  Aoc.Day1.Part2.parse_line(line)
+end)
+|> Enum.map(fn line ->
+  Aoc.Day1.Part1.line_to_only_first_and_last_number(line)
+end)
+|> Enum.map(fn val ->
+  {num, ""} = Integer.parse(val)
+  num
+end)
+|> Enum.sum()
+```
