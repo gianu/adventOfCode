@@ -1,0 +1,96 @@
+# AoC 2023 - Day 2
+
+```elixir
+Mix.install([:kino])
+```
+
+## Section
+
+```elixir
+input = Kino.Input.textarea("enter your input")
+```
+
+```elixir
+defmodule AoC.Day2 do
+  def parse_line(line) do
+    line_regex = ~r/Game\s(\d+):\s(.*)/
+    [[_, id, result]] = Regex.scan(line_regex, line)
+
+    maxs =
+      result
+      |> String.split(";", trim: true)
+      |> Enum.flat_map(fn set ->
+        set
+        |> String.split(",", trim: true)
+        |> Enum.map(&parse_set(&1))
+      end)
+      |> Enum.reduce(%{:green => 0, :red => 0, :blue => 0}, fn val, acc ->
+        {color, count} = val
+
+        if count > acc[color] do
+          Map.put(acc, color, count)
+        else
+          acc
+        end
+      end)
+
+    {num, ""} = Integer.parse(id)
+    {num, maxs}
+  end
+
+  def filter_line_part_1({_id, local_max}, maximums) do
+    cond do
+      local_max[:green] > maximums[:green] ->
+        false
+
+      local_max[:red] > maximums[:red] ->
+        false
+
+      local_max[:blue] > maximums[:blue] ->
+        false
+
+      true ->
+        true
+    end
+  end
+
+  defp parse_set(set) do
+    set_regex = ~r/(\d+)\s(.*)/
+    [[_, count, color]] = Regex.scan(set_regex, set)
+    {num, ""} = Integer.parse(count)
+    atom_color = String.to_atom(color)
+    {atom_color, num}
+  end
+end
+```
+
+## Part 1
+
+```elixir
+maximums = %{
+  red: 12,
+  green: 13,
+  blue: 14
+}
+
+input
+|> Kino.Input.read()
+|> String.split("\n", trim: true)
+|> Enum.map(&AoC.Day2.parse_line(&1))
+|> Enum.filter(&AoC.Day2.filter_line_part_1(&1, maximums))
+|> Enum.map(fn {id, _} -> id end)
+|> Enum.sum()
+```
+
+## Part 2
+
+```elixir
+input
+|> Kino.Input.read()
+|> String.split("\n", trim: true)
+|> Enum.map(&AoC.Day2.parse_line(&1))
+|> Enum.map(fn {_, %{green: green, red: red, blue: blue}} ->
+  green * red * blue
+end)
+|> Enum.sum()
+```
