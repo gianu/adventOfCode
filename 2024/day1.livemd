@@ -1,0 +1,73 @@
+# AoC 2024 - Day 1
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.14.2"}
+])
+```
+
+## Setup
+
+```elixir
+input = Kino.Input.textarea("input file")
+```
+
+## Part 1
+
+```elixir
+input
+  |> Kino.Input.read()
+  |> String.split("\n", trim: true)
+  |> Enum.map(fn row ->
+    String.split(row, " ", trim: true)
+  end)
+|> Enum.reduce(%{first: [], second: []}, fn ([val1, val2], acc) ->
+  %{
+    first: [ String.to_integer(val1) | acc.first],
+    second: [ String.to_integer(val2) | acc.second]
+  }
+end)
+|> then( fn output ->
+  %{
+    first: Enum.sort(output.first),
+    second: Enum.sort(output.second)
+  }
+end)
+|> then( fn output ->
+  output.first
+  |> Enum.with_index()
+  |> Enum.map(fn ({val, idx}) ->
+    abs(val - Enum.at(output.second, idx))
+  end)
+
+end)
+|> Enum.sum()
+```
+
+## Part 2
+
+```elixir
+input
+  |> Kino.Input.read()
+  |> String.split("\n", trim: true)
+  |> Enum.map(fn row ->
+    String.split(row, " ", trim: true)
+  end)
+|> Enum.reduce(%{first: [], second: []}, fn ([val1, val2], acc) ->
+  %{
+    first: [ String.to_integer(val1) | acc.first],
+    second: [ String.to_integer(val2) | acc.second]
+  }
+end)
+|> then(fn output ->
+  output.first
+  |> Enum.reduce(0, fn(val, acc) ->
+    count = output.second
+      |> Enum.count(fn x ->
+        x == val
+      end)
+
+    acc + val * count
+  end)
+end)
+```
