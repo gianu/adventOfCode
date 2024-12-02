@@ -1,0 +1,79 @@
+# AoC 2024 - Day 2
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.14.2"}
+])
+```
+
+## Setup
+
+```elixir
+input = Kino.Input.textarea("Input text")
+```
+
+## Part 1
+
+```elixir
+input
+|> Kino.Input.read()
+|> String.split("\n", trim: true)
+|> Enum.map(fn line ->
+  line
+  |> String.split(" ", trim: true)
+  |> Enum.map(fn num ->
+    String.to_integer(num)
+  end)
+  |> Enum.chunk_every(2, 1, :discard)
+  |> Enum.map(fn [val1, val2] ->
+    val1 - val2
+  end)
+end)
+|> Enum.map(fn line ->
+  safe_asc = line |> Enum.all?(fn num ->
+    num > 0 and num <= 3
+  end)
+  safe_desc = line |> Enum.all?(fn num ->
+    num < 0 and num >= -3
+  end)
+
+  safe_asc or safe_desc
+end)
+|> Enum.count(fn val -> val end)
+```
+
+## Part 2
+
+```elixir
+defmodule AoC2024.Day2 do
+  def valid?([a, b | _]) when abs(b - a) not in [1, 2, 3], do: false
+  def valid?([a, b | rest]), do: valid?([b | rest], b - a)
+  def valid?([_], _dir), do: true
+
+  def valid?([a, b | rest], dir) do
+    new_dir = b - a
+  
+    if ((dir < 0 and new_dir < 0) or (dir > 0 and new_dir > 0)) and abs(new_dir) <= 3 do
+      valid?([b | rest], new_dir)
+    else
+      false
+    end
+  end
+end
+
+input
+|> Kino.Input.read()
+|> String.split("\n", trim: true)
+|> Enum.map(fn line ->
+  line
+  |> String.split(" ", trim: true)
+  |> Enum.map(fn num ->
+    String.to_integer(num)
+  end)
+end)
+|> Enum.count(fn line ->
+  Enum.find_value(0..(length(line) - 1), false, fn val ->
+    line |> List.delete_at(val) |> AoC2024.Day2.valid?()
+  end)
+end)
+```
